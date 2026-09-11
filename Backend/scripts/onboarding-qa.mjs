@@ -1,4 +1,4 @@
-import "../dist/src/config/runtime.js";
+import "../src/config/runtime.ts";
 import { chromium } from "@playwright/test";
 import sharp from "sharp";
 import { readdir, readFile, mkdir } from "node:fs/promises";

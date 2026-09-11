@@ -15,7 +15,7 @@ services:
   app:
     build: .
     restart: unless-stopped
-    env_file: .env
+    env_file: Backend/.env
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://founders:${POSTGRES_PASSWORD}@postgres:5432/founders?connection_limit=10

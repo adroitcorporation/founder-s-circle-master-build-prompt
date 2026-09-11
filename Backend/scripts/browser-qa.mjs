@@ -1,4 +1,4 @@
-import "../dist/src/config/runtime.js";
+import "../src/config/runtime.ts";
 import { chromium } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";

@@ -1,4 +1,4 @@
-import "../dist/src/config/runtime.js";
+import "../src/config/runtime.ts";
 import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { PrismaClient } from "@prisma/client";

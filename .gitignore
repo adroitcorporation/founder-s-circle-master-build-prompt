@@ -48,3 +48,11 @@ next-env.d.ts
 !.env.example
 playwright-report/
 test-results/
+
+# Independent frontend/backend packages
+**/node_modules/
+**/dist/
+**/coverage/
+**/*.tsbuildinfo
+!Frontend/.env.example
+!Backend/.env.example

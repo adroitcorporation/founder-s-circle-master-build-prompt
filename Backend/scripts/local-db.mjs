@@ -1,4 +1,4 @@
-import "../dist/src/config/runtime.js";
+import "../src/config/runtime.ts";
 import EmbeddedPostgres from "embedded-postgres";
 import { existsSync } from "node:fs";
 

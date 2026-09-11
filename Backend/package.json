@@ -1,0 +1,68 @@
+{
+  "name": "founders-circle-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "start": "node dist/src/server.js",
+    "lint": "eslint src prisma tests scripts/*.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
+    "db:generate": "prisma generate",
+    "db:local": "node --import tsx scripts/local-db.mjs",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --skip-seed && tsx prisma/seed.ts",
+    "db:taxonomy": "tsx scripts/seed-taxonomy.ts",
+    "db:seed:community": "tsx scripts/seed-community.ts",
+    "admin:create": "tsx scripts/bootstrap-admin.ts",
+    "college:add": "tsx scripts/add-college.ts",
+    "test:browser": "node --import tsx scripts/browser-qa.mjs && node --import tsx scripts/onboarding-qa.mjs",
+    "test:community:browser": "node --import tsx scripts/community-qa.mjs",
+    "test:moderation:browser": "node --import tsx scripts/moderation-qa.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1130.0",
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "multer": "^2.3.0",
+    "nodemailer": "^10.0.3",
+    "prisma": "^6.19.3",
+    "sharp": "^0.35.4",
+    "socket.io": "^4.8.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "22.19.19",
+    "@types/nodemailer": "^8.0.1",
+    "@types/supertest": "^7.2.1",
+    "@typescript-eslint/eslint-plugin": "8.59.3",
+    "@typescript-eslint/parser": "8.59.3",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "eslint": "9.39.4",
+    "prettier": "^3.9.6",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.13",
+    "typescript": "5.9.3",
+    "socket.io-client": "^4.8.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
+  }
+}
