@@ -74,6 +74,10 @@ variables are currently required. All `/api` and `/socket.io` traffic goes throu
 the Vite proxy. Never put database, email, storage or account secrets in frontend
 variables, including variables with the `VITE_` prefix.
 
+Before logging in, PostgreSQL must also be running. For the existing local database,
+run `npm --prefix Backend run db:local` from the repository root in a separate
+terminal and leave it running. Do not run migrations or seeding just to log in.
+
 Start the backend in one terminal:
 
 ```sh
