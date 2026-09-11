@@ -1,0 +1,3 @@
+
+> founders-circle-backend@0.1.0 lint
+> eslint src prisma tests scripts/*.ts

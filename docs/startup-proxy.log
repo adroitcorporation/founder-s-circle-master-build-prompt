@@ -1,0 +1,25 @@
+
+$ cd Backend && npm start
+
+$ cd Frontend && npm run dev
+
+> founders-circle-frontend@0.1.0 dev
+> vite
+
+
+> founders-circle-backend@0.1.0 start
+> node dist/src/server.js
+
+
+  VITE v8.3.0  ready in 295 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+Founder’s Circle API ready at http://localhost:3001
+
+Browser frontend API helper and Vite proxy: {"status":401,"body":{"error":"Please log in to continue."},"apiError":"Please log in to continue.","preflightStatus":204,"loginVisible":true}
+Browser API responses: ["401 http://localhost:5173/api/profiles/me","401 http://localhost:5173/api/me","401 http://localhost:5173/api/me","204 http://localhost:5173/api/me"]
+Browser page errors: []
+Backend serving Frontend/dist: HTTP 200, built asset reference: true
+PASS: frontend 5173 -> backend 3001, real browser request reached auth middleware. No cookies supplied; no database query was needed.
+Validation servers stopped before the first retention interval.

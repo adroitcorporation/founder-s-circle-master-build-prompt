@@ -27,17 +27,17 @@ The app is implemented and tested locally. It has **not been deployed to a produ
 
 | Location | Purpose |
 | --- | --- |
-| `client/App.tsx` | App shell, navigation, session state and socket lifecycle |
-| `client/pages/` | Authentication, onboarding/profile editor, discovery, connections, messaging, settings, notifications and moderation |
-| `client/components/` | Student cards, profile images/cropping, accessible dialogs, safety controls |
-| `client/styles.css` | Dark charcoal theme, red-orange accents, responsive layouts |
-| `server/routes/` | Feature-specific authenticated REST endpoints |
-| `server/services/` | Authorization policy, recommendations, messaging, storage, retention, email, events and notifications |
-| `server/middleware/auth.ts`, `server/sockets.ts` | Session/role checks and authenticated real-time transport |
-| `prisma/schema.prisma`, `prisma/migrations/` | Relational schema and four migrations |
-| `prisma/seed.ts` | 30 fictional student accounts, five test colleges, taxonomy, connections and messages |
-| `tests/backend.test.ts` | PostgreSQL-backed backend/security integration tests |
-| `scripts/browser-qa.mjs`, `scripts/onboarding-qa.mjs` | Browser regression and new-user/two-user tests |
+| `Frontend/src/App.tsx` | App shell, navigation, session state and socket lifecycle |
+| `Frontend/src/pages/` | Authentication, onboarding/profile editor, discovery, connections, messaging, settings, notifications and moderation |
+| `Frontend/src/components/` | Student cards, profile images/cropping, accessible dialogs, safety controls |
+| `Frontend/src/index.css` | Dark charcoal theme, red-orange accents, responsive layouts |
+| `Backend/src/routes/` | Feature-specific authenticated REST endpoints |
+| `Backend/src/services/` | Authorization policy, recommendations, messaging, storage, retention, email, events and notifications |
+| `Backend/src/middleware/auth.middleware.ts`, `Backend/src/sockets.ts` | Session/role checks and authenticated real-time transport |
+| `Backend/prisma/schema.prisma`, `Backend/prisma/migrations/` | Relational schema and four migrations |
+| `Backend/prisma/seed.ts` | 30 fictional student accounts, five test colleges, taxonomy, connections and messages |
+| `Backend/tests/backend.test.ts` | PostgreSQL-backed backend/security integration tests |
+| `Backend/scripts/browser-qa.mjs`, `Backend/scripts/onboarding-qa.mjs` | Browser regression and new-user/two-user tests |
 
 ## Database migrations
 
@@ -50,42 +50,78 @@ Apply migrations with `npm run db:migrate`. Never use the reset command on a pro
 
 ## Local setup
 
-Requires Node 24 and npm. PostgreSQL can be supplied externally or run with the included development-only embedded PostgreSQL helper.
+Requires Node 24 and npm. Frontend and Backend have independent package manifests
+and lockfiles. From the repository root, install both:
 
 ```sh
-npm ci
+npm --prefix Frontend ci
+npm --prefix Backend ci
 ```
 
-Copy `.env.example` to `.env`. Replace `CHANGE_ME` in `DATABASE_URL` with a strong local password and set `SEED_PASSWORD` to a separate development password of at least 12 characters. Keep `APP_ORIGIN=http://localhost:5173` for development. Never commit `.env`.
+On this computer npm is installed at `C:\Program Files\nodejs\npm.cmd`. If a
+PowerShell terminal cannot find npm, reopen it after updating PATH, or replace
+`npm` in these commands with `& 'C:\Program Files\nodejs\npm.cmd'`.
 
-If no PostgreSQL instance is available, start this in a terminal and leave it running:
+Keep backend settings in `Backend/.env` (ignored by Git). For a new checkout,
+copy `Backend/.env.example` there and configure the database URL. Set a local
+`SEED_PASSWORD` of at least 12 characters only if you intend to seed sample users.
+Use `NODE_ENV=development`, `PORT=3001`, and
+`APP_ORIGIN=http://localhost:5173`. Never overwrite an existing `.env` as a setup
+step. The Phase 1 restructure preserved this computer's existing backend values.
+
+`Frontend/.env.example` documents the frontend configuration: no environment
+variables are currently required. All `/api` and `/socket.io` traffic goes through
+the Vite proxy. Never put database, email, storage or account secrets in frontend
+variables, including variables with the `VITE_` prefix.
+
+Start the backend in one terminal:
 
 ```sh
-npm run db:local
-```
-
-In another terminal:
-
-```sh
-npm run db:generate
-npm run db:migrate
-npm run db:seed
-npm run dev:server
-```
-
-In a third terminal:
-
-```sh
+cd Backend
 npm run dev
 ```
 
-Open **http://localhost:5173**. Use this exact hostname so origin protection matches your configuration.
+Start the frontend in another terminal, from the repository root:
 
-Test logins: `student@example.test`, `student2@example.test`, or `admin@example.test`. All use your `SEED_PASSWORD`. Seed identities and colleges are explicitly marked Test. The first student already has two conversations and pending requests. The seed script refuses production mode and is idempotent.
+```sh
+cd Frontend
+npm run dev
+```
 
-To reset your development database, run `npm run db:reset` and confirm Prisma’s destructive-reset prompt. This erases the selected database. Keep it development-only.
+Open **http://localhost:5173**. The API remains on **http://localhost:3001**.
+Root aliases `npm run dev` and `npm run dev:server` remain available.
 
-Without SMTP, verification/reset links are saved in **`work/mail/`**, which the app never serves. This is local development behavior only; production startup requires SMTP.
+For a built local run:
+
+```sh
+npm --prefix Frontend run build
+npm --prefix Backend run build
+npm --prefix Backend start
+```
+
+The backend also serves `Frontend/dist` for the existing deployment flow. For
+local authentication, use the frontend origin on port 5173 as configured above.
+
+### Existing database and optional first-time database setup
+
+Phase 1 did not start, migrate, seed, reset, query, or move PostgreSQL data.
+The existing embedded database remains at `work/postgres`. Backend runtime
+configuration preserves the repository root as the working directory, so existing
+`work/uploads`, `work/mail`, `work/qa`, and database paths continue to work.
+
+When you explicitly need to run the existing embedded database, use
+`npm --prefix Backend run db:local` and leave it running. An external PostgreSQL
+server is also supported through the unchanged database URL.
+
+For a separate, intentional first-time database setup, the existing commands are
+`npm --prefix Backend run db:migrate` and `npm --prefix Backend run db:seed`.
+Do not run these merely because folders moved. `db:reset` is destructive and is
+not part of ordinary startup or Phase 1 validation.
+
+Seeded test logins, when sample data is already installed, are
+`student@example.test`, `student2@example.test`, and `admin@example.test`, using
+your `SEED_PASSWORD`. Without SMTP or Resend, development mail is written to
+`work/mail`, which is not publicly served.
 
 ## Environment variables
 
@@ -111,7 +147,7 @@ This app requires a long-running **Node server** with PostgreSQL and WebSocket s
 
 1. Provision PostgreSQL, an HTTPS domain/reverse proxy, SMTP, and a private S3 bucket with encryption. Deny public bucket access. Configure secrets in your hosting platform.
 2. Configure the production `APP_ORIGIN`. Configure the reverse proxy to forward `/api`, `/socket.io` WebSocket upgrades, and frontend requests to this app on port 3001. Keep the app on one instance for this MVP.
-3. Build and start with `npm ci`, `npm run build`, `npm run db:migrate`, `npm start`, or use `docker compose up --build -d` after configuring `.env` and `POSTGRES_PASSWORD`. The Docker image runs migrations at startup and runs the app as a non-root user. Compose binds the app to localhost for an HTTPS reverse proxy; it does not provision HTTPS itself.
+3. Build and start with `npm --prefix Frontend ci`, `npm --prefix Backend ci`, `npm run build`, `npm run db:migrate`, and `npm start`, or use `docker compose --env-file Backend/.env up --build -d` after configuring `Backend/.env` and `POSTGRES_PASSWORD`. The Docker image runs migrations at startup and runs the app as a non-root user. Compose binds the app to localhost for an HTTPS reverse proxy; it does not provision HTTPS itself.
 4. Before admitting students, run `npm run db:taxonomy` to initialize interests/skills without sample users. Add each actual college with `COLLEGE_NAME` and `COLLEGE_DOMAINS` plus `npm run college:add`. Independently validate exact college domains; do not blindly trust the test seed’s allowlist.
 5. Create the first moderator using `ADMIN_EMAIL`, a strong `ADMIN_PASSWORD`, and `npm run admin:create` from an operator environment with dependencies installed and access to the production database. The script refuses to overwrite an existing account. Remove the bootstrap password afterward.
 6. Test live SMTP delivery, private bucket access, WebSocket upgrades, session cookies, the health endpoint, and a two-user conversation on the actual deployment. Configure backups and a named moderation owner before the student pilot.
@@ -120,12 +156,14 @@ For a local build smoke test, keep `NODE_ENV=development` and your local service
 
 ## Validation
 
+Current Phase 1 results are in [the report](docs/phase-1-report.md). The database-writing backend and browser regression suites below are for a separately authorized development test run.
+
 ```sh
 npm run typecheck
 npm run lint
 npm test
 npm run build
-npm audit --omit=dev
+npm --prefix Backend audit --omit=dev
 ```
 
 Browser checks require running local servers and the test seed. The scripts use installed Microsoft Edge through Playwright; on another OS, change the channel or install a Playwright browser.
@@ -136,7 +174,7 @@ npm run test:browser
 
 Browser QA intentionally sends sample messages, files reports on fictional accounts, and creates/deletes a QA account. Run it only against development. Backend test cleanup removes its own QA fixtures; it never resets the whole database.
 
-Validation performed: 26 PostgreSQL-backed backend tests; real Socket.IO send/receive and revoked-session checks; desktop/mobile browser interactions; widths **360, 390, 414, 768, 1024 and 1440**; full new-user onboarding and email-link verification; two simultaneous browser sessions proving live receipt without refresh; persisted history after reload; account deletion. Type checking, lint and production build were run. See `VALIDATION.md` for final results and limitations.
+Historical validation before Phase 1 (not rerun against PostgreSQL in this pass): 26 PostgreSQL-backed backend tests; real Socket.IO send/receive and revoked-session checks; desktop/mobile browser interactions; widths **360, 390, 414, 768, 1024 and 1440**; full new-user onboarding and email-link verification; two simultaneous browser sessions proving live receipt without refresh; persisted history after reload; account deletion. Type checking, lint and production build were run. See [Phase 1 report](docs/phase-1-report.md) for the current restructuring checks, actual command output, and limitations.
 
 ## Boundaries and remaining operational work
 
@@ -150,5 +188,5 @@ Validation performed: 26 PostgreSQL-backed backend tests; real Socket.IO send/re
 - Conversation/moderation evidence remains after account deletion. A final retention period and operator deletion process for that evidence must be chosen before public launch. Private documents/photos use the implemented cleanup queue; alert on persistent cleanup failures.
 - The optional WebMCP navigation hook is feature-detected. A supported WebMCP runtime was unavailable for validation; it is not required for ordinary app functionality.
 
-Architecture references: [Prisma transaction isolation and retries](https://www.prisma.io/docs/orm/v6/prisma-client/queries/transactions) and [embedded PostgreSQL development helper](https://github.com/leinelissen/embedded-postgres).
+Architecture references: [Prisma transaction isolation and retries](https://www.prisma.io/docs/orm/v6/prisma-Frontend/src/queries/transactions) and [embedded PostgreSQL development helper](https://github.com/leinelissen/embedded-postgres).
 

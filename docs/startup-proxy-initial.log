@@ -1,0 +1,22 @@
+
+$ cd Backend && npm start
+
+$ cd Frontend && npm run dev
+
+> founders-circle-frontend@0.1.0 dev
+> vite
+
+
+> founders-circle-backend@0.1.0 start
+> node dist/src/server.js
+
+error when starting dev server:
+Error: Port 5173 is already in use
+    at httpServerStart (file:///C:/Users/saadc/Documents/founder-s-circle-master-build-prompt/Frontend/node_modules/vite/dist/node/chunks/node.js:14167:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async startServer (file:///C:/Users/saadc/Documents/founder-s-circle-master-build-prompt/Frontend/node_modules/vite/dist/node/chunks/node.js:24582:30)
+    at async Object.listen (file:///C:/Users/saadc/Documents/founder-s-circle-master-build-prompt/Frontend/node_modules/vite/dist/node/chunks/node.js:24396:4)
+    at async CAC.<anonymous> (file:///C:/Users/saadc/Documents/founder-s-circle-master-build-prompt/Frontend/node_modules/vite/dist/node/cli.js:725:3)
+FAIL: Error: A server exited before readiness
+    at C:\Users\saadc\Documents\ChatGPT\Founder's Circle Web App\phase1-smoke.cjs:34:59
+Validation servers stopped before the first retention interval.
