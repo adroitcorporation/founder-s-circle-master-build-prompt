@@ -6,10 +6,10 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "prisma generate && vite build && tsc -p tsconfig.server.json",
+    "dev": "npm --prefix Frontend run dev",
+    "build": "prisma generate && npm --prefix Frontend run build && tsc -p tsconfig.server.json",
     "start": "node dist/server/server/index.js",
-    "lint": "eslint client server prisma tests scripts/*.ts",
+    "lint": "eslint Frontend/src server prisma tests scripts/*.ts",
     "db:generate": "prisma generate",
     "dev:server": "tsx watch server/index.ts",
     "db:local": "node scripts/local-db.mjs",

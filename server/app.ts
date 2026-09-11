@@ -85,9 +85,9 @@ export function createApp() {
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Not found." });
   });
-  app.use(express.static("dist/client"));
+  app.use(express.static("Frontend/dist"));
   app.get("/{*path}", (_req, res) =>
-    res.sendFile("index.html", { root: "dist/client" }),
+    res.sendFile("index.html", { root: "Frontend/dist" }),
   );
   app.use(
     (

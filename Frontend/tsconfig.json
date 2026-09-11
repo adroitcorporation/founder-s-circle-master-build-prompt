@@ -18,16 +18,12 @@
     ],
     "paths": {
       "@/*": [
-        "./Frontend/src/*"
+        "./src/*"
       ]
     }
   },
   "include": [
-    "Frontend/src",
-    "server",
-    "prisma",
-    "tests",
-    "Frontend/vite.config.ts",
-    "scripts/*.ts"
+    "src",
+    "vite.config.ts"
   ]
 }
