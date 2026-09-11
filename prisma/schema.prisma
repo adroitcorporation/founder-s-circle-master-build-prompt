@@ -1,0 +1,336 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+  USER
+  ADMIN
+}
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  DELETED
+}
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+enum ReviewStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  passwordHash String
+  role Role @default(USER)
+  status AccountStatus @default(ACTIVE)
+  verified Boolean @default(false)
+  canPostEvents Boolean @default(false)
+  createdAt DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+  profile Profile?
+  sessions UserSession[]
+  tokens AuthToken[]
+  verifications Verification[]
+  sent Connection[] @relation("sender")
+  received Connection[] @relation("recipient")
+  blocks Block[] @relation("blocker")
+  blockedBy Block[] @relation("blocked")
+  participants ConversationParticipant[]
+  messages Message[]
+  reports Report[] @relation("reporter")
+  reported Report[] @relation("reported")
+  notifications Notification[]
+  passes Pass[] @relation("passer")
+  passedBy Pass[] @relation("passed")
+  adminActions AdminAction[]
+  events AnalyticsEvent[]
+  ideas Idea[]
+  resonances IdeaResonance[]
+  hostedEvents CampusEvent[]
+  rsvps EventRSVP[]
+}
+model College {
+  id String @id @default(cuid())
+  name String @unique
+  domains String[]
+  profiles Profile[]
+}
+model Profile {
+  id String @id @default(cuid())
+  userId String @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  username String @unique
+  collegeId String?
+  college College? @relation(fields: [collegeId], references: [id])
+  degree String @default("")
+  year Int @default(1)
+  bio String @default("")
+  about String @default("")
+  photoKey String?
+  city String @default("")
+  hobbies String[]
+  goals String[]
+  careerInterests String[]
+  startupInterests String[]
+  socialLinks String[]
+  showCity Boolean @default(false)
+  showSocialLinks Boolean @default(false)
+  discoverable Boolean @default(true)
+  profileVisibility String @default("STUDENTS")
+  allowRequests Boolean @default(true)
+  notifyMessages Boolean @default(true)
+  notifyConnections Boolean @default(true)
+  completed Boolean @default(false)
+  interests UserInterest[]
+  skills UserSkill[]
+  updatedAt DateTime @updatedAt
+  @@index([collegeId, year])
+  @@index([discoverable, completed])
+}
+model Interest {
+  id String @id
+  name String
+  category String
+  users UserInterest[]
+}
+model UserInterest {
+  profileId String
+  interestId String
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id])
+  @@id([profileId, interestId])
+  @@index([interestId])
+}
+model Skill {
+  id String @id
+  name String @unique
+  users UserSkill[]
+}
+model UserSkill {
+  profileId String
+  skillId String
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id])
+  @@id([profileId, skillId])
+  @@index([skillId])
+}
+model Connection {
+  id String @id @default(cuid())
+  pairKey String @unique
+  senderId String
+  recipientId String
+  sender User @relation("sender", fields: [senderId], references: [id])
+  recipient User @relation("recipient", fields: [recipientId], references: [id])
+  status ConnectionStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  conversation Conversation?
+  @@index([recipientId, status])
+  @@index([senderId, status])
+}
+model Block {
+  id String @id @default(cuid())
+  blockerId String
+  blockedId String
+  blocker User @relation("blocker", fields: [blockerId], references: [id])
+  blocked User @relation("blocked", fields: [blockedId], references: [id])
+  createdAt DateTime @default(now())
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+model Conversation {
+  id String @id @default(cuid())
+  connectionId String? @unique
+  connection Connection? @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  kind String @default("DIRECT")
+  name String?
+  ideaId String?
+  idea Idea? @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  groupKey String? @unique
+  participants ConversationParticipant[]
+  messages Message[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+}
+model ConversationParticipant {
+  conversationId String
+  userId String
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+  lastReadAt DateTime @default(now())
+  leftAt DateTime?
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+model Message {
+  id String @id @default(cuid())
+  conversationId String
+  senderId String
+  clientId String
+  body String
+  removed Boolean @default(false)
+  system Boolean @default(false)
+  createdAt DateTime @default(now())
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender User @relation(fields: [senderId], references: [id])
+  reports Report[]
+  @@unique([senderId, clientId])
+  @@index([conversationId, createdAt, id])
+}
+model Report {
+  id String @id @default(cuid())
+  reporterId String
+  reportedUserId String
+  messageId String?
+  dedupeKey String @unique
+  reason String
+  description String
+  status ReviewStatus @default(PENDING)
+  reporter User @relation("reporter", fields: [reporterId], references: [id])
+  reportedUser User @relation("reported", fields: [reportedUserId], references: [id])
+  message Message? @relation(fields: [messageId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
+}
+model Notification {
+  id String @id @default(cuid())
+  recipientId String
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  type String
+  actorId String
+  entityId String
+  read Boolean @default(false)
+  createdAt DateTime @default(now())
+  @@index([recipientId, read, createdAt])
+}
+model UserSession {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([expiresAt])
+}
+model AuthToken {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose String
+  email String
+  collegeId String?
+  expiresAt DateTime
+  @@index([userId, purpose])
+}
+model Verification {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  method String
+  collegeId String
+  privateKey String?
+  status ReviewStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status])
+}
+model Pass {
+  userId String
+  targetId String
+  user User @relation("passer", fields: [userId], references: [id])
+  target User @relation("passed", fields: [targetId], references: [id])
+  createdAt DateTime @default(now())
+  @@id([userId, targetId])
+}
+model AdminAction {
+  id String @id @default(cuid())
+  adminId String
+  admin User @relation(fields: [adminId], references: [id])
+  targetId String
+  action String
+  reason String
+  createdAt DateTime @default(now())
+}
+model AnalyticsEvent {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  name String
+  createdAt DateTime @default(now())
+  @@index([name, createdAt])
+}
+model StorageDeletion {
+  key String @id
+  createdAt DateTime @default(now())
+  attempts Int @default(0)
+}
+model Idea {
+  id String @id @default(cuid())
+  authorId String
+  author User @relation(fields: [authorId], references: [id])
+  title String @default("")
+  description String
+  category String
+  lookingFor String[]
+  tags String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  resonances IdeaResonance[]
+  conversations Conversation[]
+  @@index([createdAt, id])
+  @@index([authorId, createdAt])
+  @@index([category, createdAt])
+}
+model IdeaResonance {
+  ideaId String
+  userId String
+  idea Idea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  @@id([ideaId, userId])
+  @@index([userId, createdAt])
+}
+model CampusEvent {
+  id String @id @default(cuid())
+  creatorId String
+  creator User @relation(fields: [creatorId], references: [id])
+  organizerName String
+  title String
+  description String
+  category String
+  startsAt DateTime
+  endsAt DateTime
+  timeZone String
+  location String
+  online Boolean @default(false)
+  imageKey String?
+  registrationUrl String?
+  capacity Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  rsvps EventRSVP[]
+  @@index([startsAt, id])
+  @@index([creatorId])
+  @@index([category, startsAt])
+}
+model EventRSVP {
+  eventId String
+  userId String
+  event CampusEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  @@id([eventId, userId])
+  @@index([userId])
+}
+

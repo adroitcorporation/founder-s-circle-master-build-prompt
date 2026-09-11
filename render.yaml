@@ -1,0 +1,36 @@
+# Free pilot: existing Supabase database/storage and Resend HTTPS email.
+# No paid database or disk is provisioned by this Blueprint.
+services:
+  - type: web
+    name: founders-circle
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_ORIGIN
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: "Founder's Circle <noreply@armourclub.store>"
+      - key: S3_PROVIDER
+        value: supabase
+      - key: S3_BUCKET
+        value: founders-circle-private
+      - key: S3_REGION
+        value: ap-south-1
+      - key: S3_ENDPOINT
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
