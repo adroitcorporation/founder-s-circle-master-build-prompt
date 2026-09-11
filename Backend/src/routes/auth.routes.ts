@@ -4,7 +4,7 @@ import { z } from "zod";
 import { rateLimit } from "express-rate-limit";
 import { db, transaction } from "../database.js";
 import { hash, token, assert } from "../utils.js";
-import { authenticated } from "../middleware/auth.js";
+import { authenticated } from "../middleware/auth.middleware.js";
 import { sendEmail } from "../services/email.js";
 import { event } from "../services/policy.js";
 export const authRouter = Router();

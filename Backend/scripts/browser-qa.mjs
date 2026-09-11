@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../dist/src/config/runtime.js";
 import { chromium } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";

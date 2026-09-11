@@ -1,6 +1,7 @@
+import "../src/config/runtime.js";
 import { test, mock, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { sendEmail } from "../server/services/email.js";
+import { sendEmail } from "../src/services/email.js";
 afterEach(() => mock.restoreAll());
 test("Resend sends verification links over HTTPS without SMTP", async () => {
   const old = process.env.RESEND_API_KEY;

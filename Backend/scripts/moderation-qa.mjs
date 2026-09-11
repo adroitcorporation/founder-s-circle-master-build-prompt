@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../dist/src/config/runtime.js";
 import { chromium } from "@playwright/test";
 if (process.env.NODE_ENV === "production") throw new Error("Development only.");
 const browser = await chromium.launch({ channel: "msedge", headless: true });

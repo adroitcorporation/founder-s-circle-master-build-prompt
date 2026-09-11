@@ -1,5 +1,5 @@
-import "dotenv/config";
-import { db } from "../server/database.js";
+import "../src/config/runtime.js";
+import { db } from "../src/database.js";
 if (process.env.NODE_ENV === "production")
   throw new Error("Demo seed is development-only.");
 try {

@@ -1,6 +1,7 @@
+import "../dist/src/config/runtime.js";
 import EmbeddedPostgres from "embedded-postgres";
 import { existsSync } from "node:fs";
-import "dotenv/config";
+
 const url = new URL(process.env.DATABASE_URL);
 if (!["localhost", "127.0.0.1"].includes(url.hostname))
   throw new Error("Embedded database is local-only.");

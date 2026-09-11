@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../dist/src/config/runtime.js";
 import { chromium } from "@playwright/test";
 import sharp from "sharp";
 import { readdir, readFile, mkdir } from "node:fs/promises";

@@ -1,10 +1,10 @@
-import "dotenv/config";
+import "../src/config/runtime.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
-import { db } from "../server/database.js";
-import { pair } from "../server/utils.js";
-import { saveImage } from "../server/services/storage.js";
+import { db } from "../src/database.js";
+import { pair } from "../src/utils.js";
+import { saveImage } from "../src/services/storage.js";
 if (process.env.NODE_ENV === "production")
   throw new Error("Sample data must never be seeded in production.");
 if (!process.env.SEED_PASSWORD || process.env.SEED_PASSWORD.length < 12)

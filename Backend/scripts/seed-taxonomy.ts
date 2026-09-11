@@ -1,4 +1,5 @@
-import { db } from "../server/database.js";
+import "../src/config/runtime.js";
+import { db } from "../src/database.js";
 const categories: Record<string, string[]> = {
   Technology: [
     "Artificial Intelligence",

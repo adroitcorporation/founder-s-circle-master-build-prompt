@@ -3,7 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { db, transaction } from "../database.js";
 import { profileInclude, publicProfile } from "../services/profiles.js";
-import { profileInput, settingsInput } from "../validation/profile.js";
+import { profileInput, settingsInput } from "../validators/profile.js";
 import { assert, pair, token } from "../utils.js";
 import { allowed, active, event } from "../services/policy.js";
 export const profilesRouter = Router();

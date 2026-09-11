@@ -1,6 +1,6 @@
-import "dotenv/config";
+import "../src/config/runtime.js";
 import { z } from "zod";
-import { db } from "../server/database.js";
+import { db } from "../src/database.js";
 const name = z.string().min(3).max(150).parse(process.env.COLLEGE_NAME);
 const domains = z
   .string()

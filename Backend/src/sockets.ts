@@ -1,6 +1,6 @@
 import { Server } from "socket.io";
 import type { Server as HttpServer } from "node:http";
-import { sessionUser } from "./middleware/auth.js";
+import { sessionUser } from "./middleware/auth.middleware.js";
 import { sendMessage } from "./services/messages.js";
 import { ApiError } from "./utils.js";
 export function createSockets(server: HttpServer) {

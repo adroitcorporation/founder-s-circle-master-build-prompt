@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../src/config/runtime.js";
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -7,11 +7,11 @@ import request from "supertest";
 import { io as socketClient } from "socket.io-client";
 import bcrypt from "bcryptjs";
 import sharp from "sharp";
-import { db } from "../server/database.js";
-import { createApp } from "../server/app.js";
-import { createSockets } from "../server/sockets.js";
-import { hash, token, pair } from "../server/utils.js";
-import { sendMessage } from "../server/services/messages.js";
+import { db } from "../src/database.js";
+import { createApp } from "../src/app.js";
+import { createSockets } from "../src/sockets.js";
+import { hash, token, pair } from "../src/utils.js";
+import { sendMessage } from "../src/services/messages.js";
 if (process.env.NODE_ENV === "production")
   throw new Error("Integration tests require a development database.");
 const app = createApp();

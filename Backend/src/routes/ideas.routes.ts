@@ -14,7 +14,7 @@ import {
   ideaInput,
   ideaCategories,
   pageInput,
-} from "../validation/community.js";
+} from "../validators/community.js";
 export const ideasRouter = Router();
 async function accessible(tx: Tx, viewer: string, id: string) {
   const idea = await tx.idea.findFirst({

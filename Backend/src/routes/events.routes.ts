@@ -11,7 +11,7 @@ import {
   eventInput,
   eventCategories,
   pageInput,
-} from "../validation/community.js";
+} from "../validators/community.js";
 export const eventsRouter = Router();
 const upload = multer({
   storage: multer.memoryStorage(),

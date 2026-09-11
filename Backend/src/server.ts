@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./config/runtime.js";
 import { createServer } from "node:http";
 import { createApp } from "./app.js";
 import { createSockets } from "./sockets.js";

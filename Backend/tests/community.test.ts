@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../src/config/runtime.js";
 import { test, after, before } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -6,10 +6,10 @@ import { createServer } from "node:http";
 import request from "supertest";
 import { io as client } from "socket.io-client";
 import sharp from "sharp";
-import { db } from "../server/database.js";
-import { createApp } from "../server/app.js";
-import { createSockets } from "../server/sockets.js";
-import { hash, token } from "../server/utils.js";
+import { db } from "../src/database.js";
+import { createApp } from "../src/app.js";
+import { createSockets } from "../src/sockets.js";
+import { hash, token } from "../src/utils.js";
 if (process.env.NODE_ENV === "production")
   throw new Error("Development database required");
 const app = createApp(),

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db, transaction } from "../database.js";
-import { admin } from "../middleware/auth.js";
+import { admin } from "../middleware/auth.middleware.js";
 import { assert } from "../utils.js";
 import { getImage } from "../services/storage.js";
 import { event } from "../services/policy.js";
