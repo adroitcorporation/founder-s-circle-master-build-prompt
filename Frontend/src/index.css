@@ -1,4 +1,4 @@
-@import "tailwindcss" source(none);
+@import "tailwindcss";
 @source "./";
 @source "./components/ui/Button.tsx";
 @source "./components/ui/Dialog.tsx";
@@ -282,6 +282,11 @@ button[data-slot="button"]:hover {
   padding: 34px 20px 20px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.sidebar > * {
+  flex-shrink: 0;
 }
 .sidebar .brand {
   margin: 0 14px 48px;
@@ -1423,6 +1428,30 @@ form {
 }
 .auth-box form {
   margin-top: 35px;
+}
+.auth-password-field {
+  display: block;
+  position: relative;
+}
+.auth-password-field input:not([type="checkbox"]) {
+  padding-right: 48px;
+}
+.auth-password-toggle {
+  position: absolute;
+  right: 1px;
+  top: 0;
+  width: 44px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #a797ac;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.auth-password-field input::-ms-reveal {
+  display: none;
 }
 .auth-switch {
   margin-top: 28px;

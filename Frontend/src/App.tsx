@@ -222,8 +222,9 @@ export default function App() {
   async function logout() {
     try {
       await post("/auth/logout");
-    } catch {
-      /* A deleted or revoked session is already signed out. */
+    } catch (error) {
+      feedback((error as Error).message);
+      return;
     }
     setMe(null);
     navigate("home");
@@ -333,7 +334,7 @@ export default function App() {
         </header>
         <main>
           <Suspense fallback={<Loading />}>
-            {!me.completed || page === "edit" ? (
+            {(!me.completed && page !== "settings") || page === "edit" ? (
               <ProfileEditor
                 me={me}
                 saved={() => {

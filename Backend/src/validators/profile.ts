@@ -2,7 +2,7 @@ import { z } from "zod";
 const tags = z.array(z.string().trim().min(1).max(60)).max(12);
 export const profileInput = z.object({
   name: z.string().trim().min(2).max(70),
-  username: z.string().regex(/^[a-z0-9_]{3,24}$/),
+  username: z.string().regex(/^[A-Za-z0-9_]{3,24}$/),
   collegeId: z.string().min(1),
   degree: z.string().trim().min(2).max(80),
   year: z.number().int().min(1).max(8),

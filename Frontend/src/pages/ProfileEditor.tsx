@@ -75,7 +75,7 @@ export function ProfileEditor({
   const valid =
     step === 0
       ? form.name.length >= 2 &&
-        /^[a-z0-9_]{3,24}$/.test(form.username) &&
+        /^[A-Za-z0-9_]{3,24}$/.test(form.username) &&
         form.bio.length >= 10
       : step === 1
         ? !!form.collegeId && form.degree.length >= 2
@@ -128,7 +128,7 @@ export function ProfileEditor({
                   value={form.username}
                   maxLength={24}
                   onChange={(e) =>
-                    set("username", e.target.value.toLowerCase())
+                    set("username", e.target.value)
                   }
                 />
               </label>

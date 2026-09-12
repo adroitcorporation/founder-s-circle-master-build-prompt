@@ -12,6 +12,7 @@ import { createApp } from "../src/app.js";
 import { createSockets } from "../src/sockets.js";
 import { hash, token, pair } from "../src/utils.js";
 import { sendMessage } from "../src/services/messages.js";
+import { catalogFixture } from "./catalog-fixture.js";
 if (process.env.NODE_ENV === "production")
   throw new Error("Integration tests require a development database.");
 const app = createApp();
@@ -22,6 +23,7 @@ const origin = process.env.APP_ORIGIN!;
 const prefix = `qa_${Date.now()}`;
 type Actor = { id: string; cookie: string; email: string; password: string };
 const actors: Actor[] = [];
+const catalog = catalogFixture();
 let url = "";
 function call(
   actor: Actor,
@@ -51,15 +53,11 @@ async function actor(
           name: `QA ${index}`,
           username: `${prefix}_${index}`,
           completed: true,
-          collegeId: "demo-lnmiit",
+          collegeId: catalog.collegeId,
           bio: "A database integration test student.",
           degree: "B.Tech",
           interests: {
-            create: [
-              { interestId: "artificial-intelligence" },
-              { interestId: "startups" },
-              { interestId: "hackathons" },
-            ],
+            create: catalog.interestIds.map((interestId) => ({ interestId })),
           },
         },
       },
@@ -90,6 +88,7 @@ async function connected(a: Actor, b: Actor) {
   ).id;
 }
 before(async () => {
+  await catalog.create();
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   assert(address && typeof address !== "string");
@@ -137,12 +136,14 @@ after(async () => {
       update: {},
     });
   await db.user.deleteMany({ where: { id: { in: ids } } });
+  await catalog.remove();
   await db.$disconnect();
 });
 test("authentication requires sessions, hashes passwords, persists login, prevents duplicate signup, and revokes logout", async () => {
   assert.equal((await request(app).get("/api/profiles/me")).status, 401);
   const password = `${randomUUID()}-A`;
   const email = `${prefix}_signup@example.test`;
+  const username = `Qa_${Date.now()}_AbCdEfG`;
   const r = await request(app)
     .post("/api/auth/signup")
     .set("Origin", origin)
@@ -150,10 +151,14 @@ test("authentication requires sessions, hashes passwords, persists login, preven
       email,
       password,
       name: "Test Signup",
-      username: `qa_${Date.now()}`,
+      username,
     });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const u = await db.user.findUniqueOrThrow({ where: { email } });
+  assert.equal(
+    (await db.profile.findUniqueOrThrow({ where: { userId: u.id } })).username,
+    username,
+  );
   assert.notEqual(u.passwordHash, password);
   assert(await bcrypt.compare(password, u.passwordHash));
   const a = {
@@ -578,7 +583,7 @@ test("verification uses college-domain checks, authenticated one-time tokens, an
       userId: a.id,
       email: `${prefix}@lnmiit.ac.in`,
       purpose: "VERIFY",
-      collegeId: "demo-lnmiit",
+      collegeId: catalog.collegeId,
       expiresAt: new Date(Date.now() + 60000),
     },
   });
@@ -838,13 +843,13 @@ test("ID verification is admin-only, one pending upload and expires on college c
   const update = {
     name: p.name,
     username: p.username,
-    collegeId: "demo-bits",
+    collegeId: catalog.otherCollegeId,
     degree: "B.Tech",
     year: 2,
     bio: "My new student profile.",
     about: "",
     city: "",
-    interests: ["artificial-intelligence", "startups", "hackathons"],
+    interests: catalog.interestIds,
     skills: [],
     hobbies: [],
     goals: [],

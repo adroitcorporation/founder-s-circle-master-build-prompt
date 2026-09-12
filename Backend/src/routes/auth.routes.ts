@@ -34,7 +34,7 @@ authRouter.post("/signup", async (req, res) => {
   const input = credentials
     .extend({
       name: z.string().trim().min(2).max(70),
-      username: z.string().regex(/^[a-z0-9_]{3,24}$/),
+      username: z.string().regex(/^[A-Za-z0-9_]{3,24}$/),
     })
     .parse(req.body);
   const passwordHash = await bcrypt.hash(input.password, 12);
@@ -106,10 +106,20 @@ authRouter.post("/login", async (req, res) => {
   });
   res.cookie("fc_session", raw, cookieOptions).json({ ok: true });
 });
-authRouter.post("/logout", authenticated, async (req, res) => {
-  await db.userSession.deleteMany({ where: { id: req.sessionId } });
-  req.app.get("io")?.in(`session:${req.sessionId}`).disconnectSockets(true);
-  res.clearCookie("fc_session", { path: "/" }).json({ ok: true });
+authRouter.post("/logout", async (req, res) => {
+  // Clear expired/revoked cookies too, including after account deletion.
+  const raw = req.cookies.fc_session;
+  if (typeof raw === "string" && raw) {
+    const sessionId = hash(raw);
+    await db.userSession.deleteMany({ where: { id: sessionId } });
+    req.app.get("io")?.in(`session:${sessionId}`).disconnectSockets(true);
+  }
+  res.clearCookie("fc_session", {
+    httpOnly: cookieOptions.httpOnly,
+    secure: cookieOptions.secure,
+    sameSite: cookieOptions.sameSite,
+    path: cookieOptions.path,
+  }).json({ ok: true });
 });
 authRouter.post("/forgot", async (req, res) => {
   const email = z

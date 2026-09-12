@@ -74,9 +74,13 @@ variables are currently required. All `/api` and `/socket.io` traffic goes throu
 the Vite proxy. Never put database, email, storage or account secrets in frontend
 variables, including variables with the `VITE_` prefix.
 
-Before logging in, PostgreSQL must also be running. For the existing local database,
-run `npm --prefix Backend run db:local` from the repository root in a separate
-terminal and leave it running. Do not run migrations or seeding just to log in.
+Runtime persistence uses Supabase PostgreSQL through Express and Prisma. Configure
+`DATABASE_URL` and `DIRECT_URL` with the project's session pooler URL in `Backend/.env`.
+Future uploads use the private `founders-circle-private` bucket through the existing
+S3 adapter; set `S3_PROVIDER=supabase`, `S3_REGION`, `S3_ENDPOINT`,
+`AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` there. Never expose S3 keys in the browser.
+Only the backend and frontend need to run locally; do not start `db:local`.
+Restart the backend after changing environment settings.
 
 Start the backend in one terminal:
 
@@ -106,32 +110,28 @@ npm --prefix Backend start
 The backend also serves `Frontend/dist` for the existing deployment flow. For
 local authentication, use the frontend origin on port 5173 as configured above.
 
-### Existing database and optional first-time database setup
+### Database setup
 
-Phase 1 did not start, migrate, seed, reset, query, or move PostgreSQL data.
-The existing embedded database remains at `work/postgres`. Backend runtime
-configuration preserves the repository root as the working directory, so existing
-`work/uploads`, `work/mail`, `work/qa`, and database paths continue to work.
+The Supabase application schema is already migrated. Do not import the disposable
+local accounts or files, run the demo seed, or reset the database during startup.
+The old `work/postgres` data is not used or deleted. Docker Compose uses the cloud
+connection from `Backend/.env` and does not start a PostgreSQL container.
 
-When you explicitly need to run the existing embedded database, use
-`npm --prefix Backend run db:local` and leave it running. An external PostgreSQL
-server is also supported through the unchanged database URL.
+A fresh application database needs approved reference data before onboarding:
+`npm run db:taxonomy` adds interests/skills without demo users; use `npm run college:add`
+with verified `COLLEGE_NAME` and `COLLEGE_DOMAINS` values to configure actual colleges.
+Do not use fictional test colleges as a production allowlist. Custom authentication
+remains in the normal `public` application tables, not Supabase Auth.
 
-For a separate, intentional first-time database setup, the existing commands are
-`npm --prefix Backend run db:migrate` and `npm --prefix Backend run db:seed`.
-Do not run these merely because folders moved. `db:reset` is destructive and is
-not part of ordinary startup or Phase 1 validation.
-
-Seeded test logins, when sample data is already installed, are
-`student@example.test`, `student2@example.test`, and `admin@example.test`, using
-your `SEED_PASSWORD`. Without SMTP or Resend, development mail is written to
-`work/mail`, which is not publicly served.
+Without SMTP or Resend, development reset/verification emails still go to `work/mail`.
+This is separate from profile/document uploads, which use private Supabase Storage.
 
 ## Environment variables
 
 | Variable | Use |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection URL; use a bounded connection pool, e.g. `?connection_limit=10` |
+| `DIRECT_URL` | Prisma migration connection; use the direct endpoint or session pooler |
 | `APP_ORIGIN` | Exact frontend origin; HTTPS required in production |
 | `PORT` | Server port, default 3001 |
 | `NODE_ENV` | `development` locally, `production` when deployed |
@@ -141,7 +141,6 @@ your `SEED_PASSWORD`. Without SMTP or Resend, development mail is written to
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Credentials restricted to the app’s private bucket, or use the AWS role credential chain |
 | `UPLOAD_DIR` | Local development upload directory; default `work/uploads` |
 | `SEED_PASSWORD` | Development sample-account password; never use production seeding |
-| `POSTGRES_PASSWORD` | Database service password for Docker Compose; use a URL-safe random value |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | One-time initial administrator creation; remove afterward |
 | `COLLEGE_NAME`, `COLLEGE_DOMAINS` | One-time college allowlist management; domains comma-separated |
 
@@ -151,7 +150,7 @@ This app requires a long-running **Node server** with PostgreSQL and WebSocket s
 
 1. Provision PostgreSQL, an HTTPS domain/reverse proxy, SMTP, and a private S3 bucket with encryption. Deny public bucket access. Configure secrets in your hosting platform.
 2. Configure the production `APP_ORIGIN`. Configure the reverse proxy to forward `/api`, `/socket.io` WebSocket upgrades, and frontend requests to this app on port 3001. Keep the app on one instance for this MVP.
-3. Build and start with `npm --prefix Frontend ci`, `npm --prefix Backend ci`, `npm run build`, `npm run db:migrate`, and `npm start`, or use `docker compose --env-file Backend/.env up --build -d` after configuring `Backend/.env` and `POSTGRES_PASSWORD`. The Docker image runs migrations at startup and runs the app as a non-root user. Compose binds the app to localhost for an HTTPS reverse proxy; it does not provision HTTPS itself.
+3. Build and start with `npm --prefix Frontend ci`, `npm --prefix Backend ci`, `npm run build`, `npm run db:migrate`, and `npm start`, or use `docker compose --env-file Backend/.env up --build -d` after configuring `Backend/.env`. The Docker image runs migrations at startup and runs the app as a non-root user. Compose binds the app to localhost for an HTTPS reverse proxy; it does not provision HTTPS itself.
 4. Before admitting students, run `npm run db:taxonomy` to initialize interests/skills without sample users. Add each actual college with `COLLEGE_NAME` and `COLLEGE_DOMAINS` plus `npm run college:add`. Independently validate exact college domains; do not blindly trust the test seed’s allowlist.
 5. Create the first moderator using `ADMIN_EMAIL`, a strong `ADMIN_PASSWORD`, and `npm run admin:create` from an operator environment with dependencies installed and access to the production database. The script refuses to overwrite an existing account. Remove the bootstrap password afterward.
 6. Test live SMTP delivery, private bucket access, WebSocket upgrades, session cookies, the health endpoint, and a two-user conversation on the actual deployment. Configure backups and a named moderation owner before the student pilot.
@@ -188,7 +187,8 @@ Historical validation before Phase 1 (not rerun against PostgreSQL in this pass)
 - Settings do not provide arbitrary login-email changes. College changes require re-verification; adding secure email-change confirmation is a separate enhancement.
 - Socket.IO and HTTP attempt limits assume one server instance. Multiple replicas require a shared Socket.IO adapter and distributed rate-limit store. Do not scale replicas before adding these.
 - Document storage is private and decoded images are re-encoded, but forged student IDs still require human review. Email-domain ownership alone cannot prove current enrollment. CAPTCHA/device-abuse detection is not implemented.
-- S3 integration, real SMTP, HTTPS proxying, Linux Docker execution, backups/restore, load testing and external penetration testing were **not verified in this environment**.
+- Supabase PostgreSQL and private Supabase S3 storage were verified through the running Express API: signup/login/session persistence, profile updates, idea CRUD, authorized file retrieval, access denial, and object deletion. All 30 backend tests and 8 frontend tests passed. Temporary test accounts, catalog fixtures, and uploaded objects were removed; only the application's interest/skill taxonomy was initialized.
+- Real SMTP, HTTPS proxying, Linux Docker execution, backups/restore, load testing and external penetration testing were **not verified in this environment**.
 - Conversation/moderation evidence remains after account deletion. A final retention period and operator deletion process for that evidence must be chosen before public launch. Private documents/photos use the implemented cleanup queue; alert on persistent cleanup failures.
 - The optional WebMCP navigation hook is feature-detected. A supported WebMCP runtime was unavailable for validation; it is not required for ordinary app functionality.
 

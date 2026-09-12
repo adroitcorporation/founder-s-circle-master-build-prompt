@@ -86,7 +86,7 @@ export function Admin({ feedback }: { feedback: (m: string) => void }) {
               <input
                 name="username"
                 required
-                pattern="[a-z0-9_]{3,24}"
+                pattern="[A-Za-z0-9_]{3,24}"
                 placeholder="test_alex"
               />
             </label>

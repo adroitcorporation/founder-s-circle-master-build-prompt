@@ -10,7 +10,7 @@ adminRouter.use(admin);
 adminRouter.patch("/event-publishers", async (req, res) => {
   const input = z
     .object({
-      username: z.string().regex(/^[a-z0-9_]{3,24}$/),
+      username: z.string().regex(/^[A-Za-z0-9_]{3,24}$/),
       approved: z.boolean(),
       reason: z.string().trim().min(5).max(500),
     })

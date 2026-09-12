@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { ArrowUpRight, CircleDot, Users, ShieldCheck } from "lucide-react";
+import {
+  ArrowUpRight,
+  CircleDot,
+  Users,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { Button } from "../components/Common";
 import { post } from "../api";
 export function Auth({ ready }: { ready: () => void }) {
@@ -8,12 +15,26 @@ export function Auth({ ready }: { ready: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   async function submit(form: FormData) {
     setBusy(true);
     setError("");
     setMessage("");
     try {
       const values = Object.fromEntries(form.entries());
+      if (mode === "signup") {
+        const username = String(values.username ?? "");
+        if (!/^[A-Za-z0-9_]+$/.test(username))
+          throw new Error(
+            "Username may contain only letters, numbers, and underscores. No spaces or other special characters.",
+          );
+        if (username.length < 3 || username.length > 24)
+          throw new Error("Username must be 3–24 characters long.");
+        if (values.password !== values.confirmPassword)
+          throw new Error("Passwords do not match.");
+      }
+      delete values.confirmPassword;
       await post(`/auth/${mode}`, { ...values, token: reset });
       if (mode === "forgot")
         setMessage("If an account exists, a reset link has been sent.");
@@ -101,10 +122,19 @@ export function Auth({ ready }: { ready: () => void }) {
                   Username
                   <input
                     name="username"
+                    aria-label="Username"
                     required
-                    pattern="[a-z0-9_]{3,24}"
-                    placeholder="your_username"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    aria-describedby="username-help"
+                    onInput={() => setError("")}
+                    placeholder="Choose a username"
                   />
+                  <span id="username-help" className="muted">
+                    3–24 characters: letters, numbers, and underscores only. No
+                    spaces.
+                  </span>
                 </label>
               </div>
             )}
@@ -123,17 +153,71 @@ export function Auth({ ready }: { ready: () => void }) {
             {mode !== "forgot" && (
               <label>
                 Password
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  minLength={12}
-                  maxLength={72}
-                  autoComplete={
-                    mode === "login" ? "current-password" : "new-password"
-                  }
-                  placeholder="At least 12 characters"
-                />
+                <span className="auth-password-field">
+                  <input
+                    name="password"
+                    aria-label="Password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={12}
+                    maxLength={72}
+                    autoComplete={
+                      mode === "login" ? "current-password" : "new-password"
+                    }
+                    placeholder="At least 12 characters"
+                    onInput={() => setError("")}
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={18} aria-hidden="true" />
+                    ) : (
+                      <Eye size={18} aria-hidden="true" />
+                    )}
+                  </button>
+                </span>
+              </label>
+            )}
+            {mode === "signup" && (
+              <label>
+                Confirm Password
+                <span className="auth-password-field">
+                  <input
+                    name="confirmPassword"
+                    aria-label="Confirm Password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    required
+                    minLength={12}
+                    maxLength={72}
+                    autoComplete="new-password"
+                    placeholder="Re-enter your password"
+                    onInput={() => setError("")}
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    aria-label={
+                      showConfirmPassword
+                        ? "Hide confirm password"
+                        : "Show confirm password"
+                    }
+                    aria-pressed={showConfirmPassword}
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff size={18} aria-hidden="true" />
+                    ) : (
+                      <Eye size={18} aria-hidden="true" />
+                    )}
+                  </button>
+                </span>
               </label>
             )}
             {error && (
@@ -164,6 +248,8 @@ export function Auth({ ready }: { ready: () => void }) {
               className="text-button"
               onClick={() => {
                 setMode("forgot");
+                setShowPassword(false);
+                setShowConfirmPassword(false);
                 setError("");
               }}
             >
@@ -175,6 +261,8 @@ export function Auth({ ready }: { ready: () => void }) {
             <button
               onClick={() => {
                 setMode(mode === "login" ? "signup" : "login");
+                setShowPassword(false);
+                setShowConfirmPassword(false);
                 setError("");
                 setMessage("");
               }}

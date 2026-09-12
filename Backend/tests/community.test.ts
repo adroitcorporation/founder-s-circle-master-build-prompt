@@ -10,6 +10,7 @@ import { db } from "../src/database.js";
 import { createApp } from "../src/app.js";
 import { createSockets } from "../src/sockets.js";
 import { hash, token } from "../src/utils.js";
+import { catalogFixture } from "./catalog-fixture.js";
 if (process.env.NODE_ENV === "production")
   throw new Error("Development database required");
 const app = createApp(),
@@ -18,6 +19,7 @@ const app = createApp(),
 app.set("io", io);
 const users: { id: string; cookie: string }[] = [];
 let url = "";
+const catalog = catalogFixture();
 async function actor(admin = false) {
   const raw = token();
   const u = await db.user.create({
@@ -31,7 +33,7 @@ async function actor(admin = false) {
           name: `Community Test ${users.length}`,
           username: `c${randomUUID().replaceAll("-", "").slice(0, 20)}`,
           completed: true,
-          collegeId: "demo-lnmiit",
+          collegeId: catalog.collegeId,
           degree: "B.Tech",
           bio: "Testing the student community.",
         },
@@ -61,6 +63,7 @@ function call(
     .set("Cookie", a.cookie);
 }
 before(async () => {
+  await catalog.create();
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const address = server.address();
   assert(address && typeof address !== "string");
@@ -89,6 +92,7 @@ after(async () => {
   await db.adminAction.deleteMany({ where: { adminId: { in: ids } } });
   await db.analyticsEvent.deleteMany({ where: { userId: { in: ids } } });
   await db.user.deleteMany({ where: { id: { in: ids } } });
+  await catalog.remove();
   await db.$disconnect();
 });
 const idea = {

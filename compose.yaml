@@ -1,29 +1,10 @@
 services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: founders
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong database password}
-      POSTGRES_DB: founders
-    volumes:
-      - founders_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U founders"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
   app:
     build: .
     restart: unless-stopped
     env_file: Backend/.env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://founders:${POSTGRES_PASSWORD}@postgres:5432/founders?connection_limit=10
       PORT: 3001
     ports:
       - "127.0.0.1:3001:3001"
-    depends_on:
-      postgres:
-        condition: service_healthy
-volumes:
-  founders_data:
