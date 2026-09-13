@@ -85,10 +85,13 @@ export function createApp() {
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Not found." });
   });
-  app.use(express.static("Frontend/dist"));
-  app.get("/{*path}", (_req, res) =>
-    res.sendFile("index.html", { root: "Frontend/dist" }),
-  );
+  // The React frontend is hosted separately on Vercel.
+  app.get("/", (_req, res) => {
+    res.json({ service: "Founder's Circle API", health: "/api/health" });
+  });
+  app.use((_req, res) => {
+    res.status(404).json({ error: "Not found." });
+  });
   app.use(
     (
       error: unknown,

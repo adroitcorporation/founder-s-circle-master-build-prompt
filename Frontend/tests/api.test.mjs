@@ -27,6 +27,27 @@ async function withResponse(response, run) {
   }
 }
 
+test("login sends the credential body and includes the session cookie through /api", async () => {
+  const original = globalThis.fetch;
+  const body = JSON.stringify({
+    email: "qa@example.test",
+    password: "test-password-only",
+  });
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "/api/auth/login");
+    assert.equal(options.method, "POST");
+    assert.equal(options.body, body);
+    assert.equal(options.credentials, "include");
+    assert.equal(options.headers["Content-Type"], "application/json");
+    return Response.json({ ok: true });
+  };
+  try {
+    await api("/auth/login", { method: "POST", body });
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test("preserves successful JSON responses", async () => {
   await withResponse(Response.json({ ok: true }), async () => {
     assert.deepEqual(await api("/auth/login"), { ok: true });
