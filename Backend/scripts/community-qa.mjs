@@ -18,7 +18,7 @@ async function login(email) {
   pages.push(p);
   p.setDefaultTimeout(15000);
   p.on("pageerror", (e) => errors.push(e.message));
-  await p.goto("http://localhost:5173");
+  await p.goto(import.meta.env.VITE_API_URL);
   await p.getByLabel("Email", { exact: true }).fill(email);
   await p
     .getByLabel("Password", { exact: true })
@@ -28,7 +28,7 @@ async function login(email) {
   return p;
 }
 async function go(p, route) {
-  await p.goto(`http://localhost:5173/#${route}`);
+  await p.goto(`${import.meta.env.VITE_API_URL}#${route}`);
 }
 try {
   const a = await login("student@example.test"),

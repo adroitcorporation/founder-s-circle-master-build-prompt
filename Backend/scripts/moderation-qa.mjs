@@ -4,7 +4,7 @@ if (process.env.NODE_ENV === "production") throw new Error("Development only.");
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 try {
-  await page.goto("http://localhost:5173");
+  await page.goto(import.meta.env.VITE_API_URL);
   await page.getByLabel("Email", { exact: true }).fill("admin@example.test");
   await page
     .getByLabel("Password", { exact: true })

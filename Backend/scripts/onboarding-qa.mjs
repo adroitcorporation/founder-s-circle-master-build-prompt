@@ -21,7 +21,7 @@ try {
   })
     .png()
     .toFile("work/qa/profile.png");
-  await page.goto("http://localhost:5173");
+  await page.goto(import.meta.env.VITE_API_URL);
   await page.getByRole("button", { name: "Join the circle" }).click();
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Username", { exact: true }).fill(`qa_${suffix}`);
@@ -87,7 +87,7 @@ try {
     .waitFor();
   const otherContext = await browser.newContext();
   const other = await otherContext.newPage();
-  await other.goto("http://localhost:5173");
+  await other.goto(import.meta.env.VITE_API_URL);
   await other
     .getByLabel("Email", { exact: true })
     .fill("student2@example.test");

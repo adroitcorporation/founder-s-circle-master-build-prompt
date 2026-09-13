@@ -10,7 +10,7 @@ const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 await mkdir("work/qa", { recursive: true });
 try {
-  await page.goto("http://localhost:5173");
+  await page.goto(import.meta.env.VITE_API_URL);
   await page.getByLabel("Email", { exact: true }).fill("student@example.test");
   await page
     .getByLabel("Password", { exact: true })

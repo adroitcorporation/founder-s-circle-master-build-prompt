@@ -21,7 +21,7 @@ try {
   })
     .png()
     .toFile("work/qa/profile.png");
-  await page.goto("http://localhost:5173");
+  await page.goto(import.meta.env.VITE_API_URL);
   await page.getByRole("button", { name: "Join the circle" }).click();
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Username", { exact: true }).fill(`qa_${suffix}`);
@@ -70,7 +70,7 @@ try {
   await page.getByRole("heading", { name: "Settings.", exact: true }).waitFor();
   async function me() {
     const response = await page.request.get(
-      "http://localhost:5173/api/profiles/me",
+      `${import.meta.env.VITE_API_URL}/api/profiles/me`,
     );
     assert.equal(response.status(), 200);
     return response.json();
@@ -98,9 +98,9 @@ try {
   );
   const profile = await me();
   const invalid = await page.request.put(
-    "http://localhost:5173/api/profiles/me",
+    `${import.meta.env.VITE_API_URL}/api/profiles/me`,
     {
-      headers: { Origin: "http://localhost:5173" },
+      headers: { Origin: import.meta.env.VITE_API_URL },
       data: {
         ...profile,
         collegeId: "nonexistent-college",
@@ -112,7 +112,7 @@ try {
   assert.equal(invalid.status(), 400);
   assert.equal((await me()).collegeId, second.id);
   const catalog = await (
-    await page.request.get("http://localhost:5173/api/profiles/catalog")
+    await page.request.get(`${import.meta.env.VITE_API_URL}/api/profiles/catalog`)
   ).json();
   await page.route("**/api/profiles/catalog", (route) =>
     route.fulfill({ status: 503, json: { error: "Temporary QA outage" } }),
