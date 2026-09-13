@@ -194,3 +194,18 @@ Historical validation before Phase 1 (not rerun against PostgreSQL in this pass)
 
 Architecture references: [Prisma transaction isolation and retries](https://www.prisma.io/docs/orm/v6/prisma-Frontend/src/queries/transactions) and [embedded PostgreSQL development helper](https://github.com/leinelissen/embedded-postgres).
 
+
+### Initial college catalog
+
+Run `npm --prefix Backend run college:add -- --initial` to add the ten predefined
+Jaipur colleges without demo users or other seed data. This extends the existing
+college CLI and preserves matching records (including recognized aliases), IDs,
+verification domains, and profile references on repeat runs. Review existing names
+before running against a different database to identify any additional aliases.
+New colleges have an empty email-domain allowlist: selection and college-ID review
+work, while email verification requires independently approved domains configured
+with the existing `COLLEGE_NAME` / `COLLEGE_DOMAINS` mode of `college:add`.
+
+College-specific browser regression (local servers required; creates and retains
+one QA account): `cd Backend; node --import tsx scripts/college-qa.mjs`.
+Checks selection, save/reload, editing, invalid IDs, and simulated catalog states.

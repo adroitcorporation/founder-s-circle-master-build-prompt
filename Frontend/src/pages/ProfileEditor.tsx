@@ -14,6 +14,19 @@ export function ProfileEditor({
   cancel?: () => void;
 }) {
   const [catalog, setCatalog] = useState<Catalog>();
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
+  async function loadCatalog() {
+    setCatalogLoading(true);
+    setCatalogError("");
+    try {
+      setCatalog(await api<Catalog>("/profiles/catalog"));
+    } catch (e) {
+      setCatalogError((e as Error).message);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }
   const [step, setStep] = useState(0);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,9 +50,7 @@ export function ProfileEditor({
     socialLinks: me.socialLinks,
   });
   useEffect(() => {
-    api<Catalog>("/profiles/catalog")
-      .then(setCatalog)
-      .catch((e) => setError(e.message));
+    void loadCatalog();
   }, []);
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((p) => ({ ...p, [key]: value }));
@@ -53,6 +64,11 @@ export function ProfileEditor({
     );
   }
   async function save() {
+    if (!validCollege) {
+      setError("Select a valid college before saving your profile.");
+      setStep(1);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -72,18 +88,24 @@ export function ProfileEditor({
     "Your photo",
     "Looking good",
   ];
+  const validCollege =
+    !catalogLoading &&
+    !catalogError &&
+    !!catalog?.colleges.some((college) => college.id === form.collegeId);
   const valid =
     step === 0
       ? form.name.length >= 2 &&
         /^[A-Za-z0-9_]{3,24}$/.test(form.username) &&
         form.bio.length >= 10
       : step === 1
-        ? !!form.collegeId && form.degree.length >= 2
+        ? validCollege && form.degree.length >= 2
         : step === 2
           ? form.interests.length >= 3
           : step === 4
             ? !!photo
-            : true;
+            : step === 5
+              ? validCollege
+              : true;
   return (
     <div className="editor">
       <div className="section-heading">
@@ -127,9 +149,7 @@ export function ProfileEditor({
                 <input
                   value={form.username}
                   maxLength={24}
-                  onChange={(e) =>
-                    set("username", e.target.value)
-                  }
+                  onChange={(e) => set("username", e.target.value)}
                 />
               </label>
             </div>
@@ -156,12 +176,18 @@ export function ProfileEditor({
         {step === 1 && (
           <>
             <label>
-              College
+              <span id="college-label">College</span>
               <select
+                aria-labelledby="college-label"
+                disabled={
+                  catalogLoading || !!catalogError || !catalog?.colleges.length
+                }
                 value={form.collegeId}
                 onChange={(e) => set("collegeId", e.target.value)}
               >
-                <option value="">Select your college</option>
+                <option value="" disabled>
+                  {catalogLoading ? "Loading colleges…" : "Select your college"}
+                </option>
                 {catalog?.colleges.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -169,6 +195,23 @@ export function ProfileEditor({
                 ))}
               </select>
             </label>
+            {catalogLoading && <p role="status">Loading colleges…</p>}
+            {catalogError && (
+              <p className="error" role="alert">
+                Unable to load colleges. {catalogError}
+              </p>
+            )}
+            {!catalogLoading && !catalogError && !catalog?.colleges.length && (
+              <p role="status">
+                No colleges are available yet. Please contact support or try
+                again later.
+              </p>
+            )}
+            {!catalogLoading && (catalogError || !catalog?.colleges.length) && (
+              <Button variant="outline" onClick={() => void loadCatalog()}>
+                Retry loading colleges
+              </Button>
+            )}
             {me.verified && (
               <p className="notice">
                 Changing your college removes your verification badge until you

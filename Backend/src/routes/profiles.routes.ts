@@ -40,7 +40,10 @@ profilesRouter.get("/me", async (req, res) => {
 });
 profilesRouter.get("/catalog", async (_req, res) =>
   res.json({
-    colleges: await db.college.findMany({ select: { id: true, name: true } }),
+    colleges: await db.college.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
     interests: await db.interest.findMany(),
     skills: await db.skill.findMany(),
   }),
