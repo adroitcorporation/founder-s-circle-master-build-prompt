@@ -6,7 +6,147 @@ import { conversationAccess } from "../services/policy.js";
 import { sendMessage } from "../services/messages.js";
 import { profileInclude, publicProfile } from "../services/profiles.js";
 import { visibleUser } from "../services/community.js";
+import {
+  groupInput,
+  groupCreator,
+  groupOwner,
+  eligibleMember,
+  addGroupMembers,
+} from "../services/groups.js";
+import { ApiError } from "../utils.js";
 export const messagesRouter = Router();
+messagesRouter.get("/group-candidates", async (req, res) => {
+  const query = z
+    .object({
+      groupId: z.string().optional(),
+      offset: z.coerce.number().int().min(0).default(0),
+    })
+    .parse(req.query);
+  const result = await transaction(async (tx) => {
+    const group = query.groupId
+      ? await groupOwner(tx, req.user.id, query.groupId)
+      : null;
+    if (!group) await groupCreator(tx, req.user.id);
+    const memberIds = group?.participants
+      .filter((p) => !p.leftAt)
+      .map((p) => p.userId) || [req.user.id];
+    const users = await tx.user.findMany({
+      where: {
+        AND: [
+          visibleUser(req.user.id),
+          {
+            id: { notIn: memberIds },
+            verified: true,
+            profile: { completed: true, allowRequests: true },
+            ...(group?.ideaId
+              ? { resonances: { some: { ideaId: group.ideaId } } }
+              : {
+                  OR: [
+                    {
+                      sent: {
+                        some: { recipientId: req.user.id, status: "ACCEPTED" },
+                      },
+                    },
+                    {
+                      received: {
+                        some: { senderId: req.user.id, status: "ACCEPTED" },
+                      },
+                    },
+                  ],
+                }),
+          },
+        ],
+      },
+      include: { profile: { include: profileInclude } },
+      orderBy: { id: "asc" },
+      skip: query.offset,
+      take: 31,
+    });
+    const items = [];
+    for (const user of users.slice(0, 30)) {
+      try {
+        await eligibleMember(
+          tx,
+          req.user.id,
+          user.id,
+          group?.ideaId || null,
+          memberIds,
+        );
+        items.push(publicProfile(user.profile!));
+      } catch (error) {
+        if (!(error instanceof ApiError)) throw error;
+      }
+    }
+    return { items, hasMore: users.length > 30, nextOffset: query.offset + 30 };
+  });
+  res.json(result);
+});
+messagesRouter.post("/groups", async (req, res) => {
+  const input = groupInput.parse(req.body);
+  const group = await transaction(async (tx) => {
+    await groupCreator(tx, req.user.id);
+    const ids = [...new Set(input.userIds)];
+    assert(
+      !ids.includes(req.user.id),
+      400,
+      "The creator is included automatically.",
+    );
+    for (const id of ids) await eligibleMember(tx, req.user.id, id, null, ids);
+    return tx.conversation.create({
+      data: {
+        kind: "GROUP",
+        groupKey: `circle:${crypto.randomUUID()}`,
+        ownerId: req.user.id,
+        name: input.name || "My circle",
+        participants: {
+          create: [req.user.id, ...ids].map((userId) => ({ userId })),
+        },
+      },
+      include: { participants: true },
+    });
+  });
+  for (const p of group.participants)
+    req.app.get("io")?.to(`user:${p.userId}`).emit("refresh");
+  res.status(201).json({ conversationId: group.id });
+});
+messagesRouter.post("/:id/members", async (req, res) => {
+  const input = groupInput.pick({ userIds: true }).parse(req.body);
+  const ids = await transaction((tx) =>
+    addGroupMembers(
+      tx,
+      req.user.id,
+      z.string().parse(req.params.id),
+      input.userIds,
+    ),
+  );
+  for (const id of ids) req.app.get("io")?.to(`user:${id}`).emit("refresh");
+  res.json({ ok: true });
+});
+messagesRouter.delete("/:id/members/:userId", async (req, res) => {
+  const id = z.string().parse(req.params.id),
+    userId = z.string().parse(req.params.userId);
+  const members = await transaction(async (tx) => {
+    const group = await groupOwner(tx, req.user.id, id);
+    assert(
+      userId !== group.ownerId,
+      409,
+      "The group creator cannot be removed.",
+    );
+    assert(
+      group.participants.some((p) => p.userId === userId && !p.leftAt),
+      404,
+      "Member not found.",
+    );
+    await tx.conversationParticipant.update({
+      where: { conversationId_userId: { conversationId: id, userId } },
+      data: { leftAt: new Date() },
+    });
+    return group.participants.filter((p) => !p.leftAt).map((p) => p.userId);
+  });
+  for (const userId of members)
+    req.app.get("io")?.to(`user:${userId}`).emit("refresh");
+  res.json({ ok: true });
+});
 messagesRouter.get("/", async (req, res) => {
   const conversations = await db.conversation.findMany({
     where: { participants: { some: { userId: req.user.id, leftAt: null } } },
@@ -57,6 +197,7 @@ messagesRouter.get("/", async (req, res) => {
             kind: "GROUP",
             name: c.name,
             ideaId: c.ideaId,
+            ownerId: c.ownerId,
             profile: {
               id: c.id,
               name: c.name || "Idea group",
@@ -150,6 +291,11 @@ messagesRouter.post("/:id/leave", async (req, res) => {
       include: { participants: true },
     });
     assert(c, 404, "Group not found.");
+    assert(
+      c.ownerId !== req.user.id,
+      409,
+      "The creator must remain in the group to preserve ownership.",
+    );
     await tx.conversationParticipant.update({
       where: {
         conversationId_userId: { conversationId: id, userId: req.user.id },

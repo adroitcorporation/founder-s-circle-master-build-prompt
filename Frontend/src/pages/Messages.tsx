@@ -4,6 +4,7 @@ import { ArrowLeft, Send, ShieldCheck, Flag } from "lucide-react";
 import { api, post } from "../api";
 import { Avatar, Button, Empty, Modal } from "../components/Common";
 import type { Me, Conversation, Message, Student } from "../types";
+import { GroupEditor } from "../components/GroupEditor";
 export function Messages({
   me,
   socket,
@@ -36,6 +37,7 @@ export function Messages({
   const current = list.find((c) => c.id === active);
   const [membersOpen, setMembersOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [groupEditor, setGroupEditor] = useState<string | null>(null);
   useEffect(() => {
     api<Conversation[]>("/messages")
       .then(setList)
@@ -149,6 +151,7 @@ export function Messages({
           <span className="eyebrow">KEEP THE CONVERSATION GOING</span>
           <h1>Messages.</h1>
         </div>
+        <Button onClick={() => setGroupEditor("")}>Create group</Button>
         <span className="muted">
           {socket?.connected ? "Connected" : "Reconnecting…"}
         </span>
@@ -366,7 +369,7 @@ export function Messages({
       {current?.kind === "GROUP" && membersOpen && (
         <Modal
           title="Group members"
-          description="Blocking a member also leaves shared idea groups. Private profile settings still apply."
+          description="Blocking a member also leaves shared groups. Private profile settings still apply. The creator cannot leave or be removed through group controls."
           close={() => setMembersOpen(false)}
         >
           <div className="people-panel">
@@ -375,24 +378,61 @@ export function Messages({
                 <Avatar person={p} />
                 <div>
                   <strong>{p.id === me.id ? `${p.name} (you)` : p.name}</strong>
+                  {p.id === current.ownerId && <small>Creator</small>}
                   <small>{p.college}</small>
+                  <div className="row-actions">
+                    {p.id !== me.id && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setMembersOpen(false);
+                          safety(p);
+                        }}
+                      >
+                        Safety controls
+                      </Button>
+                    )}
+                    {current.ownerId === me.id && p.id !== me.id && (
+                      <Button
+                        variant="outline"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            await api(
+                              `/messages/${current.id}/members/${p.id}`,
+                              { method: "DELETE" },
+                            );
+                            setList(await api<Conversation[]>("/messages"));
+                            feedback("Member removed.");
+                          } catch (e) {
+                            feedback((e as Error).message);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Remove member
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                {p.id !== me.id && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setMembersOpen(false);
-                      safety(p);
-                    }}
-                  >
-                    Safety controls
-                  </Button>
-                )}
               </div>
             ))}
           </div>
+          {current.ownerId === me.id && (
+            <Button
+              onClick={() => {
+                setMembersOpen(false);
+                setGroupEditor(current.id);
+              }}
+            >
+              Add members
+            </Button>
+          )}
           <Button
             variant="outline"
+            disabled={current.ownerId === me.id}
             onClick={() => {
               setMembersOpen(false);
               setLeaving(true);
@@ -429,6 +469,22 @@ export function Messages({
             {busy ? "Leaving…" : "Leave group"}
           </Button>
         </Modal>
+      )}
+      {groupEditor !== null && (
+        <GroupEditor
+          groupId={groupEditor || undefined}
+          close={() => setGroupEditor(null)}
+          done={(id) => {
+            setGroupEditor(null);
+            void api<Conversation[]>("/messages")
+              .then((rows) => {
+                setList(rows);
+                setActive(id);
+              })
+              .catch((e) => feedback(e.message));
+            feedback(groupEditor ? "Members added." : "Group created.");
+          }}
+        />
       )}
     </>
   );

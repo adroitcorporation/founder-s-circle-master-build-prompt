@@ -82,6 +82,9 @@ after(async () => {
     where: { conversationId: { in: cids } },
   });
   await db.conversation.deleteMany({ where: { id: { in: cids } } });
+  await db.connection.deleteMany({
+    where: { OR: [{ senderId: { in: ids } }, { recipientId: { in: ids } }] },
+  });
   await db.ideaResonance.deleteMany({ where: { userId: { in: ids } } });
   await db.idea.deleteMany({ where: { authorId: { in: ids } } });
   await db.eventRSVP.deleteMany({ where: { userId: { in: ids } } });
@@ -102,6 +105,332 @@ const idea = {
   tags: ["learning"],
   lookingFor: ["Design"],
 };
+test("Outgoing requests cancel only while pending, disappear for both users, and can be sent again", async () => {
+  const a = await actor(),
+    b = await actor(),
+    outsider = await actor();
+  const pending = await call(a, "post", "/connections").send({
+    targetId: b.id,
+  });
+  assert.equal(pending.status, 201);
+  const id = pending.body.id;
+  assert(
+    (await call(b, "get", "/connections")).body.some(
+      (c: { id: string }) => c.id === id,
+    ),
+  );
+  for (const user of [b, outsider])
+    assert.equal(
+      (await call(user, "delete", `/connections/${id}`)).status,
+      404,
+    );
+  assert.equal((await call(a, "delete", `/connections/${id}`)).status, 200);
+  for (const user of [a, b])
+    assert(
+      !(await call(user, "get", "/connections")).body.some(
+        (c: { id: string }) => c.id === id,
+      ),
+    );
+  assert.equal(
+    await db.notification.count({
+      where: { entityId: id, type: "CONNECTION_REQUEST" },
+    }),
+    0,
+  );
+  const again = await call(a, "post", "/connections").send({ targetId: b.id });
+  assert.equal(again.status, 201);
+  assert.notEqual(again.body.id, id);
+  assert.equal(
+    (
+      await call(b, "patch", `/connections/${again.body.id}`).send({
+        status: "ACCEPTED",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await call(a, "delete", `/connections/${again.body.id}`)).status,
+    409,
+  );
+});
+
+test("Accepted connections create groups; only the creator manages eligible members", async () => {
+  const a = await actor(),
+    b = await actor(),
+    c = await actor(),
+    d = await actor(),
+    outsider = await actor();
+  for (const user of [b, c, d]) {
+    const pending = await call(a, "post", "/connections").send({
+      targetId: user.id,
+    });
+    assert.equal(
+      (
+        await call(user, "patch", `/connections/${pending.body.id}`).send({
+          status: "ACCEPTED",
+        })
+      ).status,
+      200,
+    );
+  }
+  const candidates = await call(a, "get", "/messages/group-candidates");
+  assert.deepEqual(
+    candidates.body.items.map((p: { id: string }) => p.id).sort(),
+    [b.id, c.id, d.id].sort(),
+  );
+  assert.equal(
+    (
+      await call(a, "post", "/messages/groups").send({
+        name: "Not eligible",
+        userIds: [outsider.id],
+      })
+    ).status,
+    403,
+  );
+  const created = await call(a, "post", "/messages/groups").send({
+    name: "Our circle",
+    userIds: [b.id, c.id, b.id],
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const id = created.body.conversationId;
+  for (const user of [a, b, c]) {
+    assert(
+      (await call(user, "get", "/messages")).body.some(
+        (g: { id: string }) => g.id === id,
+      ),
+    );
+    assert.equal((await call(user, "get", `/messages/${id}`)).status, 200);
+  }
+  assert.equal(
+    (await call(b, "post", `/messages/${id}/members`).send({ userIds: [d.id] }))
+      .status,
+    403,
+  );
+  assert.equal(
+    (await call(b, "get", `/messages/group-candidates?groupId=${id}`)).status,
+    403,
+  );
+  assert.equal(
+    (await call(b, "delete", `/messages/${id}/members/${c.id}`)).status,
+    403,
+  );
+  assert.equal(
+    (
+      await call(a, "post", `/messages/${id}/members`).send({
+        userIds: [outsider.id],
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await call(a, "post", `/messages/${id}/members`).send({
+        userIds: [d.id],
+        ownerId: b.id,
+      })
+    ).status,
+    400,
+  );
+  for (let i = 0; i < 2; i++)
+    assert.equal(
+      (
+        await call(a, "post", `/messages/${id}/members`).send({
+          userIds: [d.id],
+        })
+      ).status,
+      200,
+    );
+  assert.equal(
+    await db.conversationParticipant.count({ where: { conversationId: id } }),
+    4,
+  );
+  assert.equal(
+    (await call(a, "delete", `/messages/${id}/members/${a.id}`)).status,
+    409,
+  );
+  assert.equal((await call(a, "post", `/messages/${id}/leave`)).status, 409);
+  assert.equal(
+    (await call(a, "delete", `/messages/${id}/members/${c.id}`)).status,
+    200,
+  );
+  assert.equal((await call(c, "get", `/messages/${id}`)).status, 404);
+  assert.equal(
+    (
+      await call(c, "post", "/messages").send({
+        conversationId: id,
+        body: "Denied",
+        clientId: randomUUID(),
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await call(d, "post", "/messages").send({
+        conversationId: id,
+        body: "Hello circle",
+        clientId: randomUUID(),
+      })
+    ).status,
+    201,
+  );
+});
+
+test("Idea groups persist across changing selections and concurrent resonators without losing history", async () => {
+  const a = await actor(),
+    b = await actor(),
+    c = await actor(),
+    d = await actor(),
+    e = await actor();
+  const ideaId = (await call(a, "post", "/ideas").send(idea)).body.id;
+  for (const user of [b, c])
+    await call(user, "put", `/ideas/${ideaId}/resonance`).send({
+      resonated: true,
+    });
+  const creations = await Promise.all(
+    [b, c].map((user) =>
+      call(a, "post", `/ideas/${ideaId}/group`).send({ userIds: [user.id] }),
+    ),
+  );
+  creations.forEach((r) => assert.equal(r.status, 201, JSON.stringify(r.body)));
+  const id = creations[0].body.conversationId;
+  assert.equal(creations[1].body.conversationId, id);
+  const message = await call(b, "post", "/messages").send({
+    conversationId: id,
+    body: "Keep our history",
+    clientId: randomUUID(),
+  });
+  assert.equal(message.status, 201);
+  const later = await Promise.all(
+    [d, e].map((user) =>
+      call(user, "put", `/ideas/${ideaId}/resonance`).send({ resonated: true }),
+    ),
+  );
+  later.forEach((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
+  for (const user of [d, e]) {
+    const history = await call(user, "get", `/messages/${id}`);
+    assert.equal(history.status, 200);
+    assert(
+      history.body.items.some((m: { id: string }) => m.id === message.body.id),
+    );
+  }
+  assert.equal(await db.conversation.count({ where: { ideaId } }), 1);
+  assert.equal(
+    await db.conversationParticipant.count({ where: { conversationId: id } }),
+    5,
+  );
+  assert.equal(
+    (await call(a, "delete", `/messages/${id}/members/${d.id}`)).status,
+    200,
+  );
+  await call(d, "put", `/ideas/${ideaId}/resonance`).send({ resonated: true });
+  assert.equal((await call(d, "get", `/messages/${id}`)).status, 404);
+  assert.equal(
+    (await call(a, "post", `/messages/${id}/members`).send({ userIds: [d.id] }))
+      .status,
+    200,
+  );
+  await call(e, "post", `/messages/${id}/leave`);
+  await call(e, "put", `/ideas/${ideaId}/resonance`).send({ resonated: true });
+  assert.equal((await call(e, "get", `/messages/${id}`)).status, 404);
+  assert.equal(
+    await db.conversationParticipant.count({ where: { conversationId: id } }),
+    5,
+  );
+});
+test("Later resonators obey invitation privacy and blocks against every active member", async () => {
+  const a = await actor(),
+    b = await actor(),
+    c = await actor(),
+    d = await actor();
+  const ideaId = (await call(a, "post", "/ideas").send(idea)).body.id;
+  await call(b, "put", `/ideas/${ideaId}/resonance`).send({ resonated: true });
+  const id = (
+    await call(a, "post", `/ideas/${ideaId}/group`).send({ userIds: [b.id] })
+  ).body.conversationId;
+  await db.profile.update({
+    where: { userId: c.id },
+    data: { allowRequests: false },
+  });
+  assert.equal(
+    (
+      await call(c, "put", `/ideas/${ideaId}/resonance`).send({
+        resonated: true,
+      })
+    ).status,
+    200,
+  );
+  assert.equal((await call(c, "get", `/messages/${id}`)).status, 404);
+  assert.equal(
+    (await call(a, "post", `/messages/${id}/members`).send({ userIds: [c.id] }))
+      .status,
+    403,
+  );
+  await db.profile.update({
+    where: { userId: c.id },
+    data: { allowRequests: true, profileVisibility: "CONNECTIONS" },
+  });
+  await call(c, "put", `/ideas/${ideaId}/resonance`).send({ resonated: true });
+  assert.equal((await call(c, "get", `/messages/${id}`)).status, 404);
+  await db.profile.update({
+    where: { userId: c.id },
+    data: { profileVisibility: "STUDENTS" },
+  });
+  await call(c, "put", `/ideas/${ideaId}/resonance`).send({ resonated: true });
+  assert.equal((await call(c, "get", `/messages/${id}`)).status, 200);
+  await call(d, "post", "/blocks").send({ targetId: b.id });
+  assert.equal(
+    (
+      await call(d, "put", `/ideas/${ideaId}/resonance`).send({
+        resonated: true,
+      })
+    ).status,
+    200,
+  );
+  assert.equal((await call(d, "get", `/messages/${id}`)).status, 404);
+  assert.equal(
+    (await call(a, "post", `/messages/${id}/members`).send({ userIds: [d.id] }))
+      .status,
+    403,
+  );
+  const candidates = await call(
+    a,
+    "get",
+    `/messages/group-candidates?groupId=${id}`,
+  );
+  assert.equal(candidates.status, 200);
+  assert.equal(candidates.body.items.length, 0);
+  assert.equal(await db.conversation.count({ where: { ideaId } }), 1);
+});
+
+test("Cancellation racing acceptance cannot remove an accepted connection", async () => {
+  const a = await actor(),
+    b = await actor();
+  const pending = await call(a, "post", "/connections").send({
+    targetId: b.id,
+  });
+  const [cancelled, accepted] = await Promise.all([
+    call(a, "delete", `/connections/${pending.body.id}`),
+    call(b, "patch", `/connections/${pending.body.id}`).send({
+      status: "ACCEPTED",
+    }),
+  ]);
+  assert(cancelled.status === 200 || cancelled.status === 409);
+  assert(accepted.status === 200 || accepted.status === 404);
+  const row = await db.connection.findUnique({
+    where: { id: pending.body.id },
+    include: { conversation: true },
+  });
+  if (cancelled.status === 200) {
+    assert.equal(row, null);
+    assert.equal(accepted.status, 404);
+  } else {
+    assert.equal(accepted.status, 200);
+    assert.equal(row?.status, "ACCEPTED");
+    assert(row?.conversation);
+  }
+});
+
 test("Ideas enforce ownership, unique resonance, notifications and private resonators", async () => {
   const a = await actor(),
     b = await actor();

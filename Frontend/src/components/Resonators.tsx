@@ -65,7 +65,7 @@ export function Resonators({
   return (
     <Modal
       title="People who resonated"
-      description="Only profiles visible to you appear here. Select up to 19 verified students to start a group."
+      description="Select verified students to start or join this idea’s existing group. Only profiles visible to you appear here."
       close={close}
     >
       <div className="people-panel">
@@ -164,27 +164,40 @@ export function Resonators({
           Load more people
         </Button>
       )}
+      {idea.collaborationGroupId && (
+        <Button
+          variant="outline"
+          onClick={() => {
+            close();
+            chat(idea.collaborationGroupId!);
+          }}
+        >
+          Open idea group
+        </Button>
+      )}
       {people.length > 0 && (
         <>
-          <label>
-            Group name
-            <input
-              maxLength={160}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
+          {!idea.collaborationGroupId && (
+            <label>
+              Group name
+              <input
+                maxLength={160}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+          )}
           <p className="meta">
-            Selected members join this conversation automatically and can leave
-            at any time.
+            Selected members join the same idea conversation. Its messages and
+            history stay together.
           </p>
           <Button
             disabled={!!busy || !selected.length || name.trim().length < 2}
             onClick={() => void group()}
           >
             {busy === "group"
-              ? "Creating…"
-              : `Create group${selected.length ? ` · ${selected.length} selected` : ""}`}
+              ? "Saving…"
+              : `${idea.collaborationGroupId ? "Add to idea group" : "Create group"}${selected.length ? ` · ${selected.length} selected` : ""}`}
           </Button>
         </>
       )}

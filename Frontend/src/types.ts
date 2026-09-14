@@ -56,6 +56,7 @@ export type Conversation = {
   kind: "DIRECT" | "GROUP";
   name?: string;
   ideaId?: string;
+  ownerId?: string;
   members?: Student[];
   profile: Student;
   blocked: boolean;
@@ -75,6 +76,7 @@ export type Message = {
   system?: boolean;
 };
 export type Idea = {
+  collaborationGroupId?: string;
   id: string;
   authorId: string;
   title: string;

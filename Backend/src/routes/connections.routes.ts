@@ -1,11 +1,38 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db, transaction } from "../database.js";
-import { allowed, event } from "../services/policy.js";
+import { active, allowed, event } from "../services/policy.js";
 import { pair, assert } from "../utils.js";
 import { notify } from "../services/notifications.js";
 import { profileInclude, publicProfile } from "../services/profiles.js";
 export const connectionsRouter = Router();
+connectionsRouter.delete("/:id", async (req, res) => {
+  const c = await transaction(async (tx) => {
+    await active(tx, req.user.id);
+    const connection = await tx.connection.findUnique({
+      where: { id: z.string().parse(req.params.id) },
+    });
+    assert(
+      connection && connection.senderId === req.user.id,
+      404,
+      "Request not found.",
+    );
+    assert(
+      connection.status === "PENDING",
+      409,
+      "Only pending outgoing requests can be cancelled.",
+    );
+    await tx.notification.deleteMany({
+      where: { entityId: connection.id, type: "CONNECTION_REQUEST" },
+    });
+    await tx.connection.delete({ where: { id: connection.id } });
+    await event(tx, req.user.id, "connection_cancelled");
+    return connection;
+  });
+  for (const id of [c.senderId, c.recipientId])
+    req.app.get("io")?.to(`user:${id}`).emit("refresh");
+  res.json({ ok: true });
+});
 connectionsRouter.get("/", async (req, res) => {
   const rows = await db.connection.findMany({
     where: {

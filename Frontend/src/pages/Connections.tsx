@@ -31,10 +31,16 @@ export function Connections({
   async function respond(id: string, status: string) {
     setBusy(id);
     try {
-      await patch(`/connections/${id}`, { status });
-      setRows(await api<Connection[]>("/connections"));
+      if (status === "CANCELLED")
+        await api(`/connections/${id}`, { method: "DELETE" });
+      else await patch(`/connections/${id}`, { status });
+      setRows(await api<Connection[]>(`/connections?offset=${offset}`));
       feedback(
-        status === "ACCEPTED" ? "Connection accepted." : "Request declined.",
+        status === "ACCEPTED"
+          ? "Connection accepted."
+          : status === "CANCELLED"
+            ? "Request cancelled."
+            : "Request declined.",
       );
     } catch (e) {
       feedback((e as Error).message);
@@ -110,7 +116,13 @@ export function Connections({
                     </Button>
                   </>
                 ) : (
-                  <span className="status-pill">Request sent</span>
+                  <Button
+                    variant="outline"
+                    disabled={busy === r.id}
+                    onClick={() => void respond(r.id, "CANCELLED")}
+                  >
+                    Cancel Request
+                  </Button>
                 )}
               </div>
             </article>

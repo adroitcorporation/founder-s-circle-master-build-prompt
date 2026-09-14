@@ -46,6 +46,7 @@ model User {
   blocks Block[] @relation("blocker")
   blockedBy Block[] @relation("blocked")
   participants ConversationParticipant[]
+  ownedGroups Conversation[] @relation("groupOwner")
   messages Message[]
   reports Report[] @relation("reporter")
   reported Report[] @relation("reported")
@@ -158,6 +159,8 @@ model Conversation {
   ideaId String?
   idea Idea? @relation(fields: [ideaId], references: [id], onDelete: SetNull)
   groupKey String? @unique
+  ownerId String?
+  owner User? @relation("groupOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   participants ConversationParticipant[]
   messages Message[]
   createdAt DateTime @default(now())

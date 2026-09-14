@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db, transaction, type Tx } from "../database.js";
-import { assert, hash } from "../utils.js";
+import { assert } from "../utils.js";
 import { active, allowed } from "../services/policy.js";
 import {
   visibleUser,
@@ -15,6 +15,11 @@ import {
   ideaCategories,
   pageInput,
 } from "../validators/community.js";
+import {
+  groupInput,
+  ideaGroup,
+  joinExistingIdeaGroup,
+} from "../services/groups.js";
 export const ideasRouter = Router();
 async function accessible(tx: Tx, viewer: string, id: string) {
   const idea = await tx.idea.findFirst({
@@ -38,6 +43,15 @@ async function detail(tx: Tx, viewer: string, id: string) {
   });
   return {
     ...idea,
+    collaborationGroupId:
+      idea.authorId === viewer
+        ? (
+            await tx.conversation.findUnique({
+              where: { groupKey: `idea:${id}` },
+              select: { id: true },
+            })
+          )?.id
+        : undefined,
     author,
     resonanceCount: count,
     resonated: !!(await tx.ideaResonance.findUnique({
@@ -129,7 +143,7 @@ ideasRouter.delete("/:id", async (req, res) => {
 ideasRouter.put("/:id/resonance", async (req, res) => {
   const id = z.string().parse(req.params.id);
   const resonated = z.boolean().parse(req.body.resonated);
-  const authorId = await transaction(async (tx) => {
+  const result = await transaction(async (tx) => {
     const idea = await accessible(tx, req.user.id, id);
     await allowed(tx, req.user.id, idea.authorId);
     const existing = await tx.ideaResonance.findUnique({
@@ -154,9 +168,13 @@ ideasRouter.put("/:id/resonance", async (req, res) => {
         },
       });
     }
-    return idea.authorId;
+    const members = resonated
+      ? await joinExistingIdeaGroup(tx, id, req.user.id)
+      : [];
+    return [idea.authorId, req.user.id, ...members];
   });
-  req.app.get("io")?.to(`user:${authorId}`).emit("refresh");
+  for (const userId of new Set(result))
+    req.app.get("io")?.to(`user:${userId}`).emit("refresh");
   res.json(await detail(db, req.user.id, id));
 });
 ideasRouter.get("/:id/resonators", async (req, res) => {
@@ -176,25 +194,17 @@ ideasRouter.get("/:id/resonators", async (req, res) => {
   });
   res.json({
     items: await Promise.all(
-      rows
-        .slice(0, 30)
-        .map(async (r) => ({
-          ...publicProfile(r.user.profile!),
-          ...(await connectionAction(db, req.user.id, r.userId)),
-        })),
+      rows.slice(0, 30).map(async (r) => ({
+        ...publicProfile(r.user.profile!),
+        ...(await connectionAction(db, req.user.id, r.userId)),
+      })),
     ),
     hasMore: rows.length > 30,
   });
 });
 ideasRouter.post("/:id/group", async (req, res) => {
   const id = z.string().parse(req.params.id);
-  const input = z
-    .object({
-      userIds: z.array(z.string()).min(1).max(19),
-      name: z.string().trim().min(2).max(160).optional(),
-    })
-    .strict()
-    .parse(req.body);
+  const input = groupInput.parse(req.body);
   const result = await transaction(async (tx) => {
     const idea = await accessible(tx, req.user.id, id);
     assert(
@@ -202,78 +212,7 @@ ideasRouter.post("/:id/group", async (req, res) => {
       403,
       "Only the author can create this group.",
     );
-    const owner = await active(tx, req.user.id);
-    assert(
-      owner.verified,
-      403,
-      "Verify your student status before creating a group.",
-    );
-    const ids = [...new Set(input.userIds)].sort();
-    assert(
-      !ids.includes(req.user.id),
-      400,
-      "The idea author is included automatically.",
-    );
-    for (const userId of ids) {
-      const [, u] = await allowed(tx, req.user.id, userId);
-      assert(
-        u.verified && u.profile?.completed && u.profile.allowRequests,
-        403,
-        "A selected student is not available for group invitations.",
-      );
-      await visibleProfile(tx, req.user.id, userId);
-      assert(
-        await tx.ideaResonance.findUnique({
-          where: { ideaId_userId: { ideaId: id, userId } },
-        }),
-        400,
-        "Select students who currently resonate with this idea.",
-      );
-    }
-    // Do not create a group containing any blocked pair, even if the owner is not involved.
-    assert(
-      !(await tx.block.findFirst({
-        where: { blockerId: { in: ids }, blockedId: { in: ids } },
-      })),
-      403,
-      "These students cannot be placed in the same group.",
-    );
-    const groupKey = hash(`${id}:${[req.user.id, ...ids].sort().join(":")}`);
-    const existing = await tx.conversation.findUnique({
-      where: { groupKey },
-      include: { participants: true },
-    });
-    if (existing) {
-      assert(
-        existing.participants.every((p) => !p.leftAt),
-        409,
-        "This group already exists and a member has left. Choose a different group of students.",
-      );
-      return { id: existing.id, ids: [] as string[] };
-    }
-    const c = await tx.conversation.create({
-      data: {
-        kind: "GROUP",
-        ideaId: id,
-        name: input.name || `${idea.title || "Untitled idea"} — Builders`,
-        groupKey,
-        participants: {
-          create: [req.user.id, ...ids].map((userId) => ({ userId })),
-        },
-        messages: {
-          create: {
-            senderId: req.user.id,
-            clientId: crypto.randomUUID(),
-            system: true,
-            body: `This group was created from the IdeaBoard idea:\n${idea.title ? idea.title + "\n" : ""}${idea.description}`,
-          },
-        },
-      },
-    });
-    for (const userId of ids)
-      await notify(tx, userId, req.user.id, "IDEA_GROUP_INVITE", c.id);
-    await notify(tx, req.user.id, req.user.id, "IDEA_GROUP_CREATED", c.id);
-    return { id: c.id, ids: [req.user.id, ...ids] };
+    return ideaGroup(tx, req.user.id, idea, input);
   });
   for (const userId of result.ids)
     req.app.get("io")?.to(`user:${userId}`).emit("refresh");
