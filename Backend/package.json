@@ -10,6 +10,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.build.json",
     "start": "node dist/src/server.js",
+    "start:production": "npm run db:migrate && npm start",
     "lint": "eslint src prisma tests scripts/*.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",

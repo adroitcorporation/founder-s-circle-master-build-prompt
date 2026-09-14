@@ -146,16 +146,24 @@ This is separate from profile/document uploads, which use private Supabase Stora
 
 ## Deployment
 
-This app requires a long-running **Node server** with PostgreSQL and WebSocket support. It does not run as a Cloudflare Worker. No production resources or credentials were supplied, so there is no live deployment URL.
+This app requires a long-running **Node server** with PostgreSQL and WebSocket support. The existing Render Docker service uses Supabase PostgreSQL; the frontend is hosted separately. It does not run as a Cloudflare Worker.
 
 1. Provision PostgreSQL, an HTTPS domain/reverse proxy, SMTP, and a private S3 bucket with encryption. Deny public bucket access. Configure secrets in your hosting platform.
 2. Configure the production `APP_ORIGIN`. Configure the reverse proxy to forward `/api`, `/socket.io` WebSocket upgrades, and frontend requests to this app on port 3001. Keep the app on one instance for this MVP.
-3. Build and start with `npm --prefix Frontend ci`, `npm --prefix Backend ci`, `npm run build`, `npm run db:migrate`, and `npm start`, or use `docker compose --env-file Backend/.env up --build -d` after configuring `Backend/.env`. The Docker image runs migrations at startup and runs the app as a non-root user. Compose binds the app to localhost for an HTTPS reverse proxy; it does not provision HTTPS itself.
+3. Build with `npm --prefix Frontend ci`, `npm --prefix Backend ci`, and `npm run build`; start production with `npm --prefix Backend run start:production`. Docker and Render use this same command. It runs `prisma migrate deploy` and starts the API only if migration succeeds. No manual SQL or separate migration command is needed on routine deploys. Compose can use `docker compose --env-file Backend/.env up --build -d`; it binds the app to localhost for an HTTPS reverse proxy and does not provision HTTPS itself.
 4. Before admitting students, run `npm run db:taxonomy` to initialize interests/skills without sample users. Add each actual college with `COLLEGE_NAME` and `COLLEGE_DOMAINS` plus `npm run college:add`. Independently validate exact college domains; do not blindly trust the test seed’s allowlist.
 5. Create the first moderator using `ADMIN_EMAIL`, a strong `ADMIN_PASSWORD`, and `npm run admin:create` from an operator environment with dependencies installed and access to the production database. The script refuses to overwrite an existing account. Remove the bootstrap password afterward.
 6. Test live SMTP delivery, private bucket access, WebSocket upgrades, session cookies, the health endpoint, and a two-user conversation on the actual deployment. Configure backups and a named moderation owner before the student pilot.
 
 For a local build smoke test, keep `NODE_ENV=development` and your local services configured. Actual production mode intentionally refuses to start without HTTPS, SMTP, and private storage.
+
+### Automatic Prisma migrations on Render
+
+`render.yaml` enables deploys on commits to the linked branch and uses the production startup gate. The Docker build generates the Prisma client; migrations run against `DIRECT_URL` at container startup, before the API listens. A migration failure exits nonzero and blocks the new backend from starting. The current free service uses this gate because Render pre-deploy commands require a paid service.
+
+One-time setup: sync the Blueprint (or mirror its Docker command and auto-deploy setting on a manually managed service), and configure `DIRECT_URL` as the existing Supabase direct endpoint or **session pooler on port 5432**, using a role authorized for schema migrations. Keep `DATABASE_URL` configured for runtime traffic and both URLs pointed at the same database/schema. Do not use the transaction pooler on port 6543 for migrations. Secrets are configured on Render, never committed.
+
+Future workflow: commit the Prisma schema **and migration files** → push → Docker build/Prisma generate → `prisma migrate deploy` → API starts. Do not edit previously deployed migration files. `npm run dev` and `npm start` remain migration-free for local development; choose `start:production` for production. See [deployment and ownership migration details](docs/automatic-prisma-deployment.md) for first-rollout checks, failure handling, and verification commands.
 
 ## Validation
 

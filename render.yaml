@@ -8,13 +8,18 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
-    autoDeployTrigger: off
+    autoDeployTrigger: commit
+    # Free web services do not support preDeployCommand. The Docker startup
+    # gate applies pending migrations and starts the API only on success.
+    dockerCommand: npm --prefix Backend run start:production
     envVars:
       - key: NODE_ENV
         value: production
       - key: TRUST_PROXY
         value: "1"
       - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
         sync: false
       - key: APP_ORIGIN
         sync: false

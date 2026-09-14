@@ -102,6 +102,8 @@ Run the build after tests finish because Windows can lock Prisma's loaded native
 
 ## Deployment and production acceptance
 
+The repository now includes an automatic migration startup gate. The deployment commands below are historical; follow [Automatic Prisma deployment](automatic-prisma-deployment.md) for the updated Render/Docker flow and corrected transactional migration. No remote migration or deployment has been performed.
+
 1. Review/apply the migration using the existing deployment workflow (`npm --prefix Backend run db:migrate` with deployment configuration). Briefly pause group creation/resonance writes during the migration/backend rollout so an old backend cannot continue writing membership-based keys. Deploy the updated backend and frontend together. The new backend requires the migration.
 2. Run `node --import tsx Backend/scripts/audit-idea-groups.ts` read-only to confirm the two historical groups remain. Check their messages and creator controls; do not expect this migration to remove the historical duplicate.
 3. With controlled production accounts, repeat A requests B → B sees pending → A cancels → B loses pending without reload → A requests again. Verify the accepted connection cannot be cancelled.

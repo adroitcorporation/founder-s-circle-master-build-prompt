@@ -19,4 +19,4 @@ COPY --from=build --chown=node:node /app/Backend/package.json ./Backend/package.
 COPY --from=build --chown=node:node /app/Frontend/dist ./Frontend/dist
 USER node
 EXPOSE 3001
-CMD ["sh", "-c", "cd Backend && npx prisma migrate deploy && npm start"]
+CMD ["npm", "--prefix", "Backend", "run", "start:production"]

@@ -52,7 +52,7 @@ connectionsRouter.get("/", async (req, res) => {
     include: {
       sender: { include: { profile: { include: profileInclude } } },
       recipient: { include: { profile: { include: profileInclude } } },
-      conversation: true,
+      conversation: { select: { id: true } },
     },
     orderBy: { updatedAt: "desc" },
     take: 50,
